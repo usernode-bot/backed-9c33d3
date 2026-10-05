@@ -37,6 +37,8 @@
     --line: 231 229 228;      /* borders, dividers, skeletons */
     --accent: 15 118 110;     /* the one accent */
     --on-accent: 255 255 255; /* text on the accent */
+    --warn: 180 83 9;         /* the "act soon" colour (warranty ending soon) */
+    --on-warn: 255 251 235;   /* text on the warn colour */
     --danger: 185 28 28;
     --on-danger: 255 255 255;
     --focus: 13 148 136;      /* the keyboard focus ring */
@@ -50,6 +52,8 @@
     --line: 68 64 60;
     --accent: 45 212 191;
     --on-accent: 4 47 46;
+    --warn: 251 191 36;
+    --on-warn: 69 26 3;
     --danger: 248 113 113;
     --on-danger: 69 10 10;
     --focus: 94 234 212;
@@ -107,6 +111,14 @@
   /* The label above a section: sentence case, never uppercase or tracked. */
   .section-label {
     @apply mb-2 px-1 text-small font-medium text-muted;
+  }
+
+  /* A small status badge: give it the colour pair per use
+     (e.g. "chip bg-accent text-on-accent"). Colour pairs used in this app:
+     bg-accent text-on-accent | bg-warn text-on-warn | bg-accent/10 text-accent
+     | bg-raised text-muted. */
+  .chip {
+    @apply inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-small font-medium;
   }
 
   /* The states of anything that loads data. Show exactly one at a time:

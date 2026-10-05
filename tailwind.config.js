@@ -52,6 +52,8 @@ module.exports = {
         line: token('line'), // borders, dividers, skeletons
         accent: token('accent'), // the one accent: the primary action
         'on-accent': token('on-accent'), // text on the accent
+        warn: token('warn'), // the "act soon" colour: warranty ending soon
+        'on-warn': token('on-warn'), // text on the warn colour
         danger: token('danger'),
         'on-danger': token('on-danger'),
         focus: token('focus'), // the keyboard focus ring

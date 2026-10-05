@@ -1,4 +1,33 @@
 {
   "description": "Keep track of receipts, warranties, and return deadlines with photo capture and smart remi",
-  "secrets": []
+  "secrets": [],
+  "llm": {
+    "purpose": "Reads receipt photos to fill in item details for you",
+    "suggested_daily_cap_cents": 100
+  },
+  "tests": [
+    { "name": "Home empty state", "path": "/", "expectText": "No items yet" },
+    {
+      "id": "items.demo-list",
+      "name": "Item list with statuses",
+      "path": "/?demo=1",
+      "expectText": "Staging demo",
+      "visual": true,
+      "impact": ["public/**", "server.js", "styles/**", "dapp.json"]
+    },
+    {
+      "id": "items.add-form",
+      "name": "Add/confirm form renders",
+      "path": "/add",
+      "expectSelector": "#item-form",
+      "visual": true,
+      "impact": ["public/**", "server.js", "styles/**", "dapp.json"]
+    },
+    {
+      "id": "items.demo-detail",
+      "name": "Item detail renders",
+      "path": "/item/900001?demo=1",
+      "expectText": "Warranty ends"
+    }
+  ]
 }
