@@ -1,29 +1,39 @@
 # Backed
 
-> **Starter template** — this repo was scaffolded by Homeroom Social
-> Vibecoding. Everything in it is placeholder example code until the
-> app's first real feature is built.
+Backed keeps track of receipts, warranties and return deadlines. Photograph
+a receipt, confirm the details it read, and the item's warranty end date and
+return deadline are on file — with a reminder before either lapses.
 
-The scaffold is a small working demo that proves the plumbing works:
+- **Capture** — take a photo of a receipt (or enter the details by hand).
+  Receipt OCR runs through the platform's LLM proxy, billed to your own AI
+  grant, and prefills store, item name, purchase date and price.
+- **Item cards** — each item holds the receipt photo, store, purchase date,
+  price, category, warranty length, warranty end date, return deadline and
+  an optional serial number.
+- **Status list** — every item carries a color-coded status: Return window
+  (open now), Warranty ending soon (within 30 days), Covered, or Expired.
+  Search by name or store and filter to what's expiring.
+- **Reminders** — 30 and 7 days before warranty expiration, and 3 days
+  before the return deadline, the item appears in the Reminders section on
+  Home.
 
-- **Sign-in** — the server verifies the platform-issued user token
-  (an RS256 JWT) on every request, so the app already knows who is
-  using it. No accounts to build.
-- **Database** — the app has its own private Postgres database; the
-  demo stores button presses in a `presses` table.
-- **Live API** — two example routes (`/api/press`,
-  `/api/leaderboard`) read and write through a real Express server.
-- **Styling** — Tailwind CSS, precompiled by `npm run build` during
-  image creation with either Kubernetes/Paketo or standalone Docker, in a
-  light and a dark look that follow the viewer's Homeroom theme.
+## How it's put together
 
-## Replacing the template
+- **Sign-in** — the server verifies the platform-issued user token (an RS256
+  JWT) on every request; visitors without an account can browse read-only.
+- **Database** — the app's own Postgres database stores items in an `items`
+  table (marked `staging:private`: receipts are personal data). Prices are
+  integer cents; dates are `DATE` columns read in UTC.
+- **Live API** — `/api/items` (list, create, detail, delete) and
+  `/api/items/scan` (receipt OCR). Status and reminders are computed at read
+  time, never stored.
+- **Styling** — Tailwind CSS, precompiled by `npm run build` during image
+  creation, in a light and a dark look that follow the viewer's Homeroom
+  theme.
 
-To change this app, ask Homeroom bot: open the app on Homeroom, tap the
-Homeroom icon in the header, then **Ask for a change**, and describe the
-app you want in plain English. The template will be replaced with your
-real app. You can also run
-Claude Code against this repo directly; start with `CLAUDE.md`, which
-carries the app-specific notes and points at the platform rules.
+## Staging demo data
 
-Once the real app exists, rewrite this README to describe it.
+The `items` table is private, so a staging preview starts empty: open
+`/?demo=1` (or `/item/900001?demo=1`) for read-only "Staging demo …" rows
+covering every status and reminder, with dates computed relative to "now"
+so the preview always shows the same picture.

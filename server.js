@@ -37,6 +37,13 @@ const GUEST_PUBLIC_KEY = (process.env.USERNODE_GUEST_JWT_PUBLIC_KEY || '')
 // Everything else requires a valid platform-issued JWT.
 const PUBLIC_API_PATHS = new Set(['/health']);
 
+// AI (receipt OCR) and durable file storage are platform services injected
+// at runtime in production. Staging and standalone runs have neither, so
+// every use is gated on presence and degrades to the manual path instead of
+// failing.
+const LLM_ENABLED = !!process.env.USERNODE_LLM_PROXY_TOKEN;
+const STORAGE_ENABLED = !!process.env.USERNODE_STORAGE_TOKEN;
+
 app.use(express.json());
 
 // The platform's three centrally hosted files — the bridge, the native UI
@@ -154,31 +161,416 @@ app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 // fresh load.
 app.get('/favicon.ico', (_req, res) => res.status(204).end());
 
-// Button press
-app.post('/api/press', async (req, res) => {
+/* ── Dates ────────────────────────────────────────────────────────────────
+ * All day arithmetic is done on 'YYYY-MM-DD' strings in UTC. The app
+ * reasons in UTC (see CLAUDE.md); DATE columns are selected as text so no
+ * timezone shifts a stored deadline by a day.
+ */
+function isoDate(d) {
+  return d.toISOString().slice(0, 10);
+}
+function daysUntil(dateStr, todayStr) {
+  const ms = Date.UTC(
+    +dateStr.slice(0, 4), +dateStr.slice(5, 7) - 1, +dateStr.slice(8, 10)
+  ) - Date.UTC(
+    +todayStr.slice(0, 4), +todayStr.slice(5, 7) - 1, +todayStr.slice(8, 10)
+  );
+  return Math.round(ms / 86400000);
+}
+function addDays(dateStr, n) {
+  const t = Date.UTC(
+    +dateStr.slice(0, 4), +dateStr.slice(5, 7) - 1, +dateStr.slice(8, 10)
+  ) + n * 86400000;
+  return new Date(t).toISOString().slice(0, 10);
+}
+function addMonths(dateStr, m) {
+  const day = +dateStr.slice(8, 10);
+  const t = new Date(Date.UTC(+dateStr.slice(0, 4), +dateStr.slice(5, 7) - 1 + m, day));
+  // Clamp day-of-month overflow (Jan 31 + 1 month lands on Mar 3 otherwise).
+  if (t.getUTCDate() !== day) t.setUTCDate(0);
+  return t.toISOString().slice(0, 10);
+}
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const CATEGORIES = ['electronics', 'appliances', 'furniture', 'clothing', 'other'];
+
+/* ── Status and reminders ─────────────────────────────────────────────────
+ * Status is computed at read time from the row's dates against req.now,
+ * never stored and never computed in SQL with NOW(). Return window beats
+ * everything: it is the action with a clock on it.
+ */
+function statusFor(item, today) {
+  if (item.return_deadline && item.return_deadline >= today) return 'return-window';
+  if (item.warranty_expires_on) {
+    const diff = daysUntil(item.warranty_expires_on, today);
+    if (diff < 0) return 'expired';
+    if (diff <= 30) return 'expiring-soon';
+  }
+  return 'covered';
+}
+
+// The fixed reminder schedule: warranty expiration minus 30 and minus 7
+// days (plus the day itself), return deadline minus 3 days (plus the day
+// itself). Exact day-counts only, so a reminder appears on the day it is
+// about, not as a standing state. Lowercase text; the page prefixes the
+// item name.
+function reminderFor(item, today) {
+  if (item.return_deadline) {
+    const diff = daysUntil(item.return_deadline, today);
+    if (diff === 3) return { kind: 'return', text: 'return window closes in 3 days' };
+    if (diff === 0) return { kind: 'return', text: 'return window closes today' };
+  }
+  if (item.warranty_expires_on) {
+    const diff = daysUntil(item.warranty_expires_on, today);
+    if (diff === 30) return { kind: 'warranty', text: 'warranty ends in 30 days' };
+    if (diff === 7) return { kind: 'warranty', text: 'warranty ends in 7 days' };
+    if (diff === 0) return { kind: 'warranty', text: 'warranty expires today' };
+  }
+  return null;
+}
+
+function presentItem(row, today) {
+  const item = { ...row };
+  item.status = statusFor(item, today);
+  item.reminder = reminderFor(item, today);
+  return item;
+}
+
+// Date columns are selected as text so they are compared in UTC.
+const ITEM_COLUMNS = `
+  id, user_id, username, name, category, store,
+  purchase_date::text AS purchase_date,
+  price_cents, warranty_months,
+  warranty_expires_on::text AS warranty_expires_on,
+  return_deadline::text AS return_deadline,
+  serial_number, receipt_file_id, receipt_url, created_at
+`;
+
+/* ── Staging demo data ────────────────────────────────────────────────────
+ * `items` is staging:private, so staging starts with an empty table — and
+ * every read route is owner-scoped, so boot-seeded rows under a fake user
+ * would be invisible to any viewer. The sanctioned mechanism here is
+ * request-time demo injection: read-only rows behind ?demo=1 that persist
+ * nothing and belong to no one. Dates are computed relative to req.now so
+ * every status, chip and reminder line shows whenever a preview is opened.
+ * Never attribute demo rows to the visitor, and never read a signal ("has
+ * this user added an item?") from them.
+ */
+function demoReceipt(label) {
+  // A tiny obviously-placeholder receipt image; platform-stored files are
+  // never cloned into staging, so demo rows carry an inline data URI.
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="200">` +
+    `<rect width="160" height="200" fill="#f5f5f4"/>` +
+    `<rect x="20" y="20" width="120" height="7" rx="3.5" fill="#78716c"/>` +
+    `<rect x="20" y="44" width="92" height="5" rx="2.5" fill="#d6d3d1"/>` +
+    `<rect x="20" y="60" width="108" height="5" rx="2.5" fill="#d6d3d1"/>` +
+    `<rect x="20" y="76" width="76" height="5" rx="2.5" fill="#d6d3d1"/>` +
+    `<rect x="20" y="104" width="120" height="1.5" fill="#a8a29e"/>` +
+    `<rect x="20" y="118" width="100" height="5" rx="2.5" fill="#d6d3d1"/>` +
+    `<rect x="20" y="134" width="120" height="7" rx="3.5" fill="#57534e"/>` +
+    `<text x="80" y="182" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#a8a29e">${label}</text>` +
+    `</svg>`;
+  return 'data:image/svg+xml,' + encodeURIComponent(svg);
+}
+
+function demoItems(today) {
+  const r = (n) => addDays(today, n);
+  return [
+    {
+      id: 900001,
+      name: 'Staging demo cordless drill',
+      category: 'electronics',
+      store: 'Staging demo hardware store',
+      purchase_date: r(-337),
+      price_cents: 12999,
+      warranty_months: 12,
+      warranty_expires_on: r(7),   // hits the 7-day warranty reminder
+      return_deadline: r(-307),
+      serial_number: 'SD-DRILL-0042',
+      receipt_file_id: null,
+      receipt_url: demoReceipt('Staging demo drill'),
+    },
+    {
+      id: 900002,
+      name: 'Staging demo espresso machine',
+      category: 'appliances',
+      store: 'Staging demo kitchen store',
+      purchase_date: r(-27),
+      price_cents: 49900,
+      warranty_months: 12,
+      warranty_expires_on: r(338),
+      return_deadline: r(3),       // hits the 3-day return reminder
+      serial_number: null,
+      receipt_file_id: null,
+      receipt_url: demoReceipt('Staging demo espresso'),
+    },
+    {
+      id: 900003,
+      name: 'Staging demo desk lamp',
+      category: 'furniture',
+      store: 'Staging demo home store',
+      purchase_date: r(-64),
+      price_cents: 4550,
+      warranty_months: 12,
+      warranty_expires_on: r(301), // comfortably covered
+      return_deadline: r(-34),
+      serial_number: null,
+      receipt_file_id: null,
+      receipt_url: null,
+    },
+    {
+      id: 900004,
+      name: 'Staging demo winter jacket',
+      category: 'clothing',
+      store: 'Staging demo outdoors store',
+      purchase_date: r(-425),
+      price_cents: 18900,
+      warranty_months: 12,
+      warranty_expires_on: r(-60), // expired, quiet
+      return_deadline: r(-395),
+      serial_number: null,
+      receipt_file_id: null,
+      receipt_url: null,
+    },
+    {
+      id: 900005,
+      name: 'Staging demo yoga mat',
+      category: 'other',
+      store: 'Staging demo sports store',
+      purchase_date: r(-20),
+      price_cents: 3200,
+      warranty_months: null,       // no warranty: return-window-only item
+      warranty_expires_on: null,
+      return_deadline: r(10),
+      serial_number: null,
+      receipt_file_id: null,
+      receipt_url: null,
+    },
+  ];
+}
+
+/* ── Items API ──────────────────────────────────────────────────────────── */
+
+app.get('/api/items', async (req, res) => {
+  const today = isoDate(req.now);
   try {
-    await pool.query(`
-      INSERT INTO presses (user_id, username) VALUES ($1, $2)
-    `, [req.user.id, req.user.username]);
-    res.json({ ok: true });
+    if (IS_STAGING && req.query.demo === '1') {
+      let demo = demoItems(today).map((i) => presentItem(i, today));
+      const q = typeof req.query.q === 'string' ? req.query.q.trim().toLowerCase() : '';
+      if (q) {
+        demo = demo.filter((i) =>
+          i.name.toLowerCase().includes(q) || (i.store || '').toLowerCase().includes(q));
+      }
+      if (req.query.filter === 'expiring') {
+        demo = demo.filter((i) => i.status === 'return-window' || i.status === 'expiring-soon');
+      }
+      return res.json({ items: demo });
+    }
+
+    const params = [req.user ? req.user.id : null];
+    let where = 'user_id = $1';
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    if (q) {
+      params.push('%' + q + '%');
+      where += ` AND (name ILIKE $${params.length} OR store ILIKE $${params.length})`;
+    }
+    const { rows } = await pool.query(
+      `SELECT ${ITEM_COLUMNS} FROM items WHERE ${where} ORDER BY created_at DESC, id DESC`,
+      params
+    );
+    let items = rows.map((row) => presentItem(row, today));
+    if (req.query.filter === 'expiring') {
+      items = items.filter((i) => i.status === 'return-window' || i.status === 'expiring-soon');
+    }
+    res.json({ items });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('GET /api/items failed:', err.message);
+    res.status(500).json({ error: 'Could not load items' });
   }
 });
 
-// Leaderboard
-app.get('/api/leaderboard', async (_req, res) => {
+app.get('/api/items/:id', async (req, res) => {
+  const today = isoDate(req.now);
   try {
-    const { rows } = await pool.query(`
-      SELECT username, COUNT(*) as presses
-      FROM presses
-      GROUP BY username
-      ORDER BY presses DESC
-      LIMIT 50
-    `);
-    res.json({ leaderboard: rows });
+    const id = Number(req.params.id);
+    if (IS_STAGING && req.query.demo === '1') {
+      const demo = demoItems(today).find((i) => i.id === id);
+      if (demo) return res.json({ item: presentItem(demo, today) });
+      // Not a demo id: fall through to the owner-scoped lookup below.
+    }
+    const { rows } = await pool.query(
+      `SELECT ${ITEM_COLUMNS} FROM items WHERE id = $1 AND user_id = $2`,
+      [id, req.user.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Item not found' });
+    res.json({ item: presentItem(rows[0], today) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('GET /api/items/:id failed:', err.message);
+    res.status(500).json({ error: 'Could not load the item' });
+  }
+});
+
+const VALID_DATE = (v) => v === null || v === undefined || v === '' ||
+  (typeof v === 'string' && DATE_RE.test(v));
+const VALID_INT = (v) => v === null || v === undefined || v === '' ||
+  (Number.isInteger(v) && v >= 0);
+
+app.post('/api/items', async (req, res) => {
+  const b = req.body || {};
+  try {
+    const name = typeof b.name === 'string' ? b.name.trim() : '';
+    if (!name) return res.status(400).json({ error: 'Item name is required' });
+    const category = CATEGORIES.includes(b.category) ? b.category : 'other';
+    if (!VALID_DATE(b.purchase_date) || !VALID_DATE(b.return_deadline)) {
+      return res.status(400).json({ error: 'Dates must be YYYY-MM-DD' });
+    }
+    if (!VALID_INT(b.price_cents) || !VALID_INT(b.warranty_months)) {
+      return res.status(400).json({ error: 'Price and warranty must be whole numbers' });
+    }
+    const purchase = DATE_RE.test(b.purchase_date || '') ? b.purchase_date : null;
+    const months = Number.isInteger(b.warranty_months) ? b.warranty_months : null;
+    // The warranty end date is decided once, at save time.
+    const warrantyExpires = purchase && months ? addMonths(purchase, months) : null;
+    const returnDeadline = DATE_RE.test(b.return_deadline || '') ? b.return_deadline : null;
+
+    const { rows } = await pool.query(`
+      INSERT INTO items
+        (user_id, username, name, category, store, purchase_date, price_cents,
+         warranty_months, warranty_expires_on, return_deadline, serial_number,
+         receipt_file_id, receipt_url)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      RETURNING id
+    `, [
+      req.user.id, req.user.username, name, category,
+      (b.store && String(b.store).trim()) || null,
+      purchase,
+      Number.isInteger(b.price_cents) ? b.price_cents : null,
+      months,
+      warrantyExpires,
+      returnDeadline,
+      (b.serial_number && String(b.serial_number).trim()) || null,
+      typeof b.receipt_file_id === 'string' ? b.receipt_file_id : null,
+      typeof b.receipt_url === 'string' ? b.receipt_url : null,
+    ]);
+    res.json({ ok: true, id: rows[0].id });
+  } catch (err) {
+    console.error('POST /api/items failed:', err.message);
+    res.status(500).json({ error: 'Could not save the item' });
+  }
+});
+
+app.delete('/api/items/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(404).json({ error: 'Item not found' });
+    const { rows } = await pool.query(
+      `DELETE FROM items WHERE id = $1 AND user_id = $2 RETURNING receipt_file_id`,
+      [id, req.user.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Item not found' });
+    // Best effort: remove the stored receipt too. A storage failure must not
+    // block the item delete — the row is already gone.
+    const fileId = rows[0].receipt_file_id;
+    if (fileId && STORAGE_ENABLED) {
+      try {
+        await fetch(`${process.env.USERNODE_STORAGE_URL}/files/${encodeURIComponent(fileId)}`, {
+          method: 'DELETE',
+          headers: {
+            'x-usernode-app-token': process.env.USERNODE_STORAGE_TOKEN,
+            'x-usernode-user-token': req.headers['x-usernode-token'],
+          },
+        });
+      } catch (err) {
+        console.warn('receipt delete failed:', err.message);
+      }
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('DELETE /api/items/:id failed:', err.message);
+    res.status(500).json({ error: 'Could not delete the item' });
+  }
+});
+
+// Receipt OCR. The photo is already stored platform-side (the page uploads
+// it with usernode.uploadFile); this call reads it through the platform's
+// LLM proxy, billed to the user's own grant. Stateless: it never writes.
+const OCR_PROMPT = `You read receipt photos for Backed, a warranty tracker. ` +
+  `Extract from this receipt photo: the store name, the item name (the main ` +
+  `product bought), the purchase date, and the total price paid.\n` +
+  `Reply with ONLY a JSON object, no other text:\n` +
+  `{"store": string or null, "item_name": string or null, ` +
+  `"purchase_date": "YYYY-MM-DD" or null, "price_cents": integer or null, ` +
+  `"low_confidence": boolean}\n` +
+  `Set low_confidence true when the photo is faded, blurry, or any value is ` +
+  `a guess or missing. If the image is not a readable receipt, return all ` +
+  `nulls with low_confidence true. Decline and return nulls if the content ` +
+  `is sexual, violent, gambling-related or otherwise disallowed.`;
+
+function parseScanJson(text) {
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start === -1 || end <= start) return null;
+  try { return JSON.parse(text.slice(start, end + 1)); } catch { return null; }
+}
+
+app.post('/api/items/scan', async (req, res) => {
+  const { receiptUrl } = req.body || {};
+  if (!LLM_ENABLED) {
+    return res.status(503).json({ error: 'ai_unavailable' });
+  }
+  if (typeof receiptUrl !== 'string' || !/^https?:\/\//.test(receiptUrl)) {
+    return res.status(400).json({ error: 'receiptUrl required' });
+  }
+  try {
+    const upstream = await fetch(`${process.env.USERNODE_LLM_PROXY_URL}/v1/messages`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'anthropic-version': '2023-06-01',
+        'x-usernode-app-token': process.env.USERNODE_LLM_PROXY_TOKEN,
+        'x-usernode-user-token': req.headers['x-usernode-token'],
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-5-5',
+        max_tokens: 1024,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'url', url: receiptUrl } },
+            { type: 'text', text: OCR_PROMPT },
+          ],
+        }],
+      }),
+    });
+
+    if (upstream.status === 403) {
+      const body = await upstream.json().catch(() => ({}));
+      return res.status(403).json({ error: body.code || 'grant_required' });
+    }
+    if (upstream.status === 429) {
+      const body = await upstream.json().catch(() => ({}));
+      return res.status(429).json({ error: body.code || 'budget_exceeded' });
+    }
+    if (!upstream.ok) {
+      console.warn('scan upstream status', upstream.status);
+      return res.status(502).json({ error: 'scan_failed' });
+    }
+
+    const data = await upstream.json();
+    const text = (data.content || []).map((b) => b.text || '').join('');
+    const parsed = parseScanJson(text);
+    if (!parsed) return res.status(502).json({ error: 'scan_failed' });
+    res.json({
+      store: typeof parsed.store === 'string' ? parsed.store : null,
+      name: typeof parsed.item_name === 'string' ? parsed.item_name : null,
+      purchase_date: DATE_RE.test(parsed.purchase_date || '') ? parsed.purchase_date : null,
+      price_cents: Number.isInteger(parsed.price_cents) && parsed.price_cents >= 0
+        ? parsed.price_cents : null,
+      low_confidence: parsed.low_confidence === true,
+    });
+  } catch (err) {
+    console.error('POST /api/items/scan failed:', err.message);
+    res.status(502).json({ error: 'scan_failed' });
   }
 });
 
@@ -198,7 +590,6 @@ app.get('*', (req, res) => {
     // path+query into the chromeless view so share links land on the
     // shared screen, not Home. The clean platform route stores `path`
     // as one encoded query value so an inner ?, &, or = survives. The
-    // shell decodes and validates it as relative-only before use. The
     // character test keeps the
     // value attribute-safe for the landing anchor below — anything
     // unusual falls back to the bare link.
@@ -220,17 +611,47 @@ app.get('*', (req, res) => {
 });
 
 async function start() {
+  // The app's own data. Receipt photos are personal purchase records, so
+  // the table is staging:private: staging clones the schema only, and the
+  // demo block above covers previews with request-time fake rows.
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS presses (
+    CREATE TABLE IF NOT EXISTS items (
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL,
       username VARCHAR(255) NOT NULL,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'other',
+      store TEXT,
+      purchase_date DATE,
+      price_cents INTEGER,
+      warranty_months INTEGER,
+      warranty_expires_on DATE,
+      return_deadline DATE,
+      serial_number TEXT,
+      receipt_file_id TEXT,
+      receipt_url TEXT,
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `);
+  await pool.query(`COMMENT ON TABLE items IS 'staging:private'`);
   const server = app.listen(port, () => console.log(`Listening on :${port}`));
   // Let Envoy retire idle upstream connections at 60s, with a 15s margin.
   server.keepAliveTimeout = 75_000;
+
+  // Platform convention: stop accepting connections, drain briefly, close
+  // the pool, exit. Without this a SIGTERM mid-request drops connections.
+  let closing = false;
+  function shutdown(signal) {
+    if (closing) return;
+    closing = true;
+    console.log(`${signal}, shutting down`);
+    server.close(() => {
+      pool.end().then(() => process.exit(0)).catch(() => process.exit(0));
+    });
+    setTimeout(() => process.exit(1), 3000).unref();
+  }
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 start().catch(err => { console.error(err); process.exit(1); });

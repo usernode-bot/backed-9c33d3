@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
+
   <script>
   // usernode-dev-console@1
   (function () {
@@ -26,8 +26,8 @@
             if (seen.has(val)) return '[Circular]';
             seen.add(val);
           }
-          if (typeof val === 'function') return '[Function ' + (val.name || 'anonymous') + ']';
-          if (val instanceof Error) return val.stack || (val.name + ': ' + val.message);
+          if (typeof val === 'function') return '[Function ' + (v.name || 'anonymous') + ']';
+          if (val instanceof Error) return val.stack || (v.name + ': ' + v.message);
           return val;
         });
       } catch (e) { try { return String(v); } catch (_) { return '[unserializable]'; } }
@@ -64,7 +64,7 @@
   })();
   </script>
   <title>Backed</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%237c3aed'/><circle cx='50' cy='50' r='18' fill='white'/></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%230f766e'/><rect x='32' y='26' width='36' height='48' rx='4' fill='white'/></svg>">
   <!-- Tailwind, PRECOMPILED for this app (was cdn.tailwindcss.com's
        in-browser engine plus an inline tailwind.config here). The config
        moved to tailwind.config.js in the repo root; npm run build compiles
@@ -110,154 +110,661 @@
 <body class="min-h-screen bg-ground text-fg">
   <!-- Built from the design kit in styles/tailwind-input.css: colour tokens
        (bg-ground, text-muted, bg-accent, ...) that are right in both looks,
-       and components (btn-primary, list, card, state-empty, ...). The real
-       app keeps the kit; CLAUDE.md's "## Design" says how. -->
-  <main class="mx-auto flex max-w-md flex-col gap-8 px-4 py-10">
+       and the kit components. Three screens, one client-side router below:
+       / (the item list), /add (capture + confirm), /item/<id> (detail). -->
+  <main class="mx-auto flex max-w-md flex-col gap-6 px-4 pb-32 pt-8">
 
-    <!-- usernode-starter-notice@1 — starter-template messaging. When building
-         the user's real app, replace this whole screen and delete this block,
-         both sentinel comments included. -->
-    <section class="card flex flex-col items-start gap-3">
-      <span class="rounded-full bg-raised px-3 py-1 text-small font-medium text-muted">Starter template</span>
-      <h1 class="text-title">Backed</h1>
-      <p class="text-body text-muted">Welcome to your new app! Everything on this screen is placeholder content that came with it.</p>
-      <p class="text-body text-muted">To change this app, ask Homeroom bot: tap the <strong class="font-semibold text-fg">Homeroom icon</strong>, then <strong class="font-semibold text-fg">Ask for a change</strong>. Describe what you'd like in plain English, and it will be turned into your real app.</p>
-    </section>
-
-    <section>
-      <h2 class="section-label">What's already working</h2>
-      <ul class="list">
-        <li class="list-row items-start">
-          <svg class="mt-0.5 h-5 w-5 shrink-0 text-accent" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7 7a1 1 0 0 1-1.4 0l-3-3a1 1 0 1 1 1.4-1.4L9 11.6l6.3-6.3a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>
-          <div>
-            <p class="text-body font-medium">Sign-in</p>
-            <p class="text-small text-muted">You're signed in through Homeroom automatically, with no accounts to build.</p>
-          </div>
-        </li>
-        <li class="list-row items-start">
-          <svg class="mt-0.5 h-5 w-5 shrink-0 text-accent" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7 7a1 1 0 0 1-1.4 0l-3-3a1 1 0 1 1 1.4-1.4L9 11.6l6.3-6.3a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>
-          <div>
-            <p class="text-body font-medium">Database</p>
-            <p class="text-small text-muted">Your app has its own private database, ready to store things.</p>
-          </div>
-        </li>
-        <li class="list-row items-start">
-          <svg class="mt-0.5 h-5 w-5 shrink-0 text-accent" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7 7a1 1 0 0 1-1.4 0l-3-3a1 1 0 1 1 1.4-1.4L9 11.6l6.3-6.3a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>
-          <div>
-            <p class="text-body font-medium">Live API</p>
-            <p class="text-small text-muted">The example below talks to a real server. Try it.</p>
-          </div>
-        </li>
-      </ul>
-    </section>
-    <!-- /usernode-starter-notice@1 -->
-
-    <section class="flex flex-col items-center gap-5">
-      <div class="w-full px-1">
-        <h2 class="text-heading">Try the example</h2>
-        <p class="text-small text-muted">This example will be replaced</p>
+    <!-- ── Home: reminders, search, filter, the item list ─────────────── -->
+    <section id="view-home" class="flex flex-col gap-6">
+      <div>
+        <h1 class="text-title">Backed</h1>
+        <p class="text-small text-muted">Receipts, warranties and return deadlines.</p>
       </div>
 
-      <button id="press-btn" class="btn-primary h-32 w-32 rounded-full text-title active:scale-95">Press!</button>
+      <section id="reminders" hidden>
+        <h2 class="section-label">Reminders</h2>
+        <ul id="reminders-list" class="list"></ul>
+      </section>
 
-      <p id="count" class="min-h-6 text-body text-muted"></p>
+      <section class="flex flex-col gap-3">
+        <input id="search" class="field" type="search" placeholder="Search items or stores"
+               aria-label="Search items or stores" autocomplete="off">
+        <div class="flex gap-2" role="group" aria-label="Filter items">
+          <button type="button" id="filter-all" class="chip bg-accent text-on-accent" aria-pressed="true">All</button>
+          <button type="button" id="filter-expiring" class="chip bg-raised text-muted" aria-pressed="false">Expiring soon</button>
+        </div>
+      </section>
 
-      <div class="w-full">
-        <h3 class="section-label">Leaderboard</h3>
+      <section>
+        <h2 class="section-label">Your items</h2>
         <!-- Anything that loads data shows exactly one of these at a time:
              loading, the data, empty (it loaded, and there is nothing yet)
-             or error (it did not load). The script below switches them. -->
-        <div id="leaderboard-loading" role="status">
-          <span class="sr-only">Loading the leaderboard</span>
+             or error (it did not load). -->
+        <div id="home-loading" role="status">
+          <span class="sr-only">Loading your items</span>
           <div class="list">
-            <div class="list-row"><div class="skeleton h-4 w-1/2"></div></div>
-            <div class="list-row"><div class="skeleton h-4 w-1/3"></div></div>
-            <div class="list-row"><div class="skeleton h-4 w-2/5"></div></div>
+            <div class="list-row"><div class="skeleton h-12 w-12"></div><div class="skeleton h-4 flex-1"></div></div>
+            <div class="list-row"><div class="skeleton h-12 w-12"></div><div class="skeleton h-4 w-2/3"></div></div>
+            <div class="list-row"><div class="skeleton h-12 w-12"></div><div class="skeleton h-4 w-1/2"></div></div>
           </div>
         </div>
-        <ol id="leaderboard" class="list" hidden></ol>
-        <div id="leaderboard-empty" class="state-empty" hidden>
-          <p class="text-heading">No presses yet</p>
-          <p class="text-body text-muted">Press the button to put your name on the board.</p>
-          <button id="leaderboard-press" class="btn-secondary">Press it</button>
+        <ul id="home-list" class="list" hidden></ul>
+        <div id="home-empty" class="state-empty" hidden>
+          <svg class="h-8 w-8 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 4.5A2.25 2.25 0 0 1 8.25 2.25h7.5L19.5 6v13.5a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5v-15A1.5 1.5 0 0 1 6 4.5Z"/><path stroke-linecap="round" d="M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg>
+          <p class="text-heading">No items yet</p>
+          <p class="text-body text-muted">Add your first receipt to start tracking warranties.</p>
         </div>
-        <div id="leaderboard-error" class="state-error" hidden>
+        <div id="home-error" class="state-error" hidden>
           <svg class="h-6 w-6 text-danger" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
-          <p class="text-heading">Couldn't load the leaderboard</p>
-          <p class="text-body text-muted">Pressing still works, and every press is saved.</p>
-          <button id="leaderboard-retry" class="btn-secondary">Retry</button>
+          <p class="text-heading">Couldn't load your items</p>
+          <p class="text-body text-muted">Adding items still works. Check your connection and try again.</p>
+          <button id="home-retry" class="btn-secondary">Retry</button>
         </div>
-      </div>
+      </section>
     </section>
 
-    <p class="text-center text-small text-muted">Built on Homeroom. This template screen disappears once you build your real app.</p>
+    <!-- ── Add: capture, then confirm the details ─────────────────────── -->
+    <section id="view-add" class="flex flex-col gap-6" hidden>
+      <div class="flex items-center gap-3">
+        <button type="button" id="add-back" class="btn-secondary">Back</button>
+        <h1 class="text-heading">Add receipt</h1>
+      </div>
+
+      <section class="card flex flex-col gap-3">
+        <p class="text-body text-muted">Take a photo of your receipt and Backed fills in the details.</p>
+        <button type="button" id="photo-btn" class="btn-primary">Take photo</button>
+        <button type="button" id="manual-btn" class="btn-secondary">Enter by hand</button>
+        <input id="photo-input" type="file" accept="image/*" capture="environment" hidden>
+        <div id="scan-status" class="flex items-center gap-3" role="status" hidden>
+          <span class="skeleton h-4 w-4 shrink-0 rounded-full"></span>
+          <p class="text-body text-muted">Reading your receipt…</p>
+        </div>
+        <p id="add-note" class="text-small text-muted" hidden></p>
+        <p id="scan-warning" class="text-small font-medium text-warn" hidden>
+          This receipt was hard to read, please check each detail.
+        </p>
+      </section>
+
+      <!-- The confirm form. Always visible on /add so manual entry works
+           everywhere, including where uploads or AI are unavailable. -->
+      <form id="item-form" class="flex flex-col gap-4" novalidate>
+        <input type="hidden" id="f-receipt-file-id">
+        <input type="hidden" id="f-receipt-url">
+        <label class="flex flex-col gap-1.5">
+          <span class="text-small font-medium">Item name</span>
+          <input id="f-name" class="field" maxlength="120" autocomplete="off">
+        </label>
+        <label class="flex flex-col gap-1.5">
+          <span class="text-small font-medium">Store</span>
+          <input id="f-store" class="field" maxlength="120" autocomplete="off">
+        </label>
+        <div class="flex gap-3">
+          <label class="flex min-w-0 flex-1 flex-col gap-1.5">
+            <span class="text-small font-medium">Purchase date</span>
+            <input id="f-purchase" class="field" type="date">
+          </label>
+          <label class="flex min-w-0 flex-1 flex-col gap-1.5">
+            <span class="text-small font-medium">Price</span>
+            <input id="f-price" class="field" type="text" inputmode="decimal" placeholder="0.00">
+          </label>
+        </div>
+        <label class="flex flex-col gap-1.5">
+          <span class="text-small font-medium">Category</span>
+          <select id="f-category" class="field">
+            <option value="electronics">Electronics</option>
+            <option value="appliances">Appliances</option>
+            <option value="furniture">Furniture</option>
+            <option value="clothing">Clothing</option>
+            <option value="other" selected>Other</option>
+          </select>
+        </label>
+        <label class="flex flex-col gap-1.5">
+          <span class="text-small font-medium">Warranty</span>
+          <select id="f-warranty" class="field">
+            <option value="">No warranty</option>
+            <option value="6">6 months</option>
+            <option value="12">12 months</option>
+            <option value="24">24 months</option>
+            <option value="36">36 months</option>
+          </select>
+        </label>
+        <label class="flex flex-col gap-1.5">
+          <span class="text-small font-medium">Return deadline</span>
+          <input id="f-return" class="field" type="date">
+        </label>
+        <label class="flex flex-col gap-1.5">
+          <span class="text-small font-medium">Serial number</span>
+          <input id="f-serial" class="field" maxlength="120" autocomplete="off" placeholder="Optional">
+        </label>
+        <p id="form-error" class="text-small text-danger" hidden></p>
+        <button type="submit" id="save-btn" class="btn-primary">Save item</button>
+      </form>
+    </section>
+
+    <!-- ── Item detail ────────────────────────────────────────────────── -->
+    <section id="view-item" class="flex flex-col gap-6" hidden>
+      <div class="flex items-center gap-3">
+        <button type="button" id="item-back" class="btn-secondary">Back</button>
+      </div>
+      <div id="item-loading" role="status">
+        <span class="sr-only">Loading the item</span>
+        <div class="card flex flex-col gap-3">
+          <div class="skeleton h-6 w-2/3"></div>
+          <div class="skeleton h-40 w-full"></div>
+          <div class="skeleton h-4 w-full"></div>
+          <div class="skeleton h-4 w-3/4"></div>
+        </div>
+      </div>
+      <div id="item-error" class="state-error" hidden>
+        <svg class="h-6 w-6 text-danger" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+        <p class="text-heading">Couldn't load this item</p>
+        <p class="text-body text-muted">Check your connection and try again.</p>
+        <button id="item-retry" class="btn-secondary">Retry</button>
+      </div>
+      <div id="item-notfound" class="state-empty" hidden>
+        <p class="text-heading">Item not found</p>
+        <p class="text-body text-muted">It may have been deleted.</p>
+      </div>
+      <div id="item-card" class="card flex flex-col gap-4" hidden>
+        <div class="flex items-center justify-between gap-2">
+          <h1 id="item-name" class="text-heading min-w-0"></h1>
+          <span id="item-chip" class="chip"></span>
+        </div>
+        <p id="item-reminder" class="text-small font-medium text-warn" hidden></p>
+        <img id="item-receipt" class="w-full rounded-lg border border-line" alt="Receipt photo" hidden>
+        <ul id="item-fields" class="list"></ul>
+        <button type="button" id="item-delete" class="btn-secondary text-danger">Delete item</button>
+      </div>
+    </section>
   </main>
 
+  <!-- The one primary action, reachable one-handed from every list state. -->
+  <div id="add-bar" class="fixed inset-x-0 bottom-0 border-t border-line bg-ground/95 px-4 pt-3"
+       style="padding-bottom: calc(1.25rem + env(safe-area-inset-bottom));" hidden>
+    <div class="mx-auto max-w-md">
+      <button type="button" id="home-add" class="btn-primary h-14 w-full">
+        <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M1.5 6.375c0-1.036.84-1.875 1.875-1.875h2.27l1.341-1.688A1.875 1.875 0 0 1 8.506 2h2.988a1.875 1.875 0 0 1 1.52.762l1.341 1.688h2.27c1.035 0 1.875.84 1.875 1.875v9.25c0 1.035-.84 1.875-1.875 1.875H3.375A1.875 1.875 0 0 1 1.5 15.625v-9.25Zm4.5 4.625a4 4 0 1 1 8 0 4 4 0 0 1-8 0Z" clip-rule="evenodd"/></svg>
+        Add receipt
+      </button>
+    </div>
+  </div>
+
   <script>
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token') || '';
-    const headers = token ? { 'x-usernode-token': token } : {};
-    const count = document.getElementById('count');
+    (function () {
+      'use strict';
 
-    // The leaderboard's states, one shown at a time. Empty only when the
-    // load worked and found nothing; a failure is the error state, never
-    // "No presses yet".
-    const views = {
-      loading: document.getElementById('leaderboard-loading'),
-      list: document.getElementById('leaderboard'),
-      empty: document.getElementById('leaderboard-empty'),
-      error: document.getElementById('leaderboard-error'),
-    };
-    function show(state) {
-      for (const [name, el] of Object.entries(views)) el.hidden = name !== state;
-    }
+      var $ = function (id) { return document.getElementById(id); };
+      var token = '';
+      var demoMode = false;
 
-    async function loadLeaderboard() {
-      let leaderboard;
-      try {
-        const res = await fetch('/api/leaderboard', { headers });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        ({ leaderboard } = await res.json());
-      } catch {
-        show('error');
-        return;
+      // ── Format helpers (all day arithmetic in UTC; see CLAUDE.md) ─────
+      function fmtDate(s) {
+        if (!s) return '';
+        var p = s.split('-');
+        return new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])).toLocaleDateString('en-GB',
+          { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
       }
-      // People's names go in as text, never as HTML.
-      views.list.replaceChildren(...leaderboard.map((r, i) => {
-        const row = document.createElement('li');
-        row.className = 'list-row justify-between';
-        const name = document.createElement('span');
-        name.textContent = (i + 1) + '. ' + r.username;
-        const presses = document.createElement('span');
-        presses.className = 'tabular-nums text-muted';
-        presses.textContent = r.presses;
-        row.append(name, presses);
-        return row;
-      }));
-      const total = leaderboard.reduce((s, r) => s + parseInt(r.presses, 10), 0);
-      count.textContent = total + (total === 1 ? ' press so far' : ' presses so far');
-      show(leaderboard.length ? 'list' : 'empty');
-    }
+      function fmtPrice(cents) {
+        if (cents === null || cents === undefined) return '';
+        return '$' + (cents / 100).toLocaleString('en-US',
+          { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+      function addDays(s, n) {
+        var p = s.split('-');
+        return new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]) + n * 86400000)
+          .toISOString().slice(0, 10);
+      }
+      function todayStr() {
+        var now = (window.usernode && window.usernode.now) ? window.usernode.now() : new Date();
+        return now.toISOString().slice(0, 10);
+      }
 
-    async function press() {
-      try {
-        const res = await fetch('/api/press', {
+      var STATUS = {
+        'return-window': { label: 'Return window', cls: 'bg-accent text-on-accent' },
+        'expiring-soon': { label: 'Warranty ending soon', cls: 'bg-warn text-on-warn' },
+        'covered': { label: 'Covered', cls: 'bg-accent/10 text-accent' },
+        'expired': { label: 'Expired', cls: 'bg-raised text-muted' },
+      };
+
+      function chipEl(status) {
+        var s = STATUS[status] || STATUS.covered;
+        var el = document.createElement('span');
+        el.className = 'chip ' + s.cls;
+        el.textContent = s.label;
+        return el;
+      }
+
+      function receiptSrc(url) {
+        if (!url || url.slice(0, 5) === 'data:') return url;
+        return url + '?token=' + encodeURIComponent(token);
+      }
+
+      // ── API: the token in a header; preview "now" forwarded as the
+      // platform's time-dependent-features convention requires ────────────
+      function api(path, options) {
+        var headers = { 'Content-Type': 'application/json' };
+        if (token) headers['x-usernode-token'] = token;
+        if (window.usernode && window.usernode.previewNow) {
+          headers['x-usernode-now'] = window.usernode.now().toISOString();
+        }
+        return fetch(path, Object.assign({ headers: headers }, options || {}));
+      }
+
+      // ── Router: / home, /add capture + confirm, /item/<id> detail ─────
+      var views = { home: $('view-home'), add: $('view-add'), item: $('view-item') };
+      var addBar = $('add-bar');
+
+      function setView(name) {
+        for (var k in views) views[k].hidden = k !== name;
+        addBar.hidden = name !== 'home';
+        window.scrollTo(0, 0);
+      }
+
+      function nav(path) {
+        var extra = [];
+        if (demoMode && path.indexOf('demo=') === -1) extra.push('demo=1');
+        if (token && path.indexOf('token=') === -1) extra.push('token=' + encodeURIComponent(token));
+        var target = extra.length
+          ? path + (path.indexOf('?') === -1 ? '?' : '&') + extra.join('&')
+          : path;
+        history.pushState({}, '', target);
+        route();
+      }
+
+      function route() {
+        var sp = new URLSearchParams(location.search);
+        if (sp.get('token')) token = sp.get('token');
+        demoMode = sp.get('demo') === '1';
+        var m = location.pathname.match(/^\/item\/(\d+)/);
+        if (m) {
+          setView('item');
+          loadDetail(+m[1]);
+        } else if (/^\/add/.test(location.pathname)) {
+          setView('add');
+        } else {
+          setView('home');
+          loadHome();
+        }
+      }
+      window.addEventListener('popstate', route);
+
+      // ── Home ──────────────────────────────────────────────────────────
+      var homeQuery = { q: '', filter: 'all' };
+      var homeViews = {
+        loading: $('home-loading'),
+        list: $('home-list'),
+        empty: $('home-empty'),
+        error: $('home-error'),
+      };
+      function showHome(state) {
+        for (var name in homeViews) homeViews[name].hidden = name !== state;
+      }
+
+      function itemRow(item) {
+        var li = document.createElement('li');
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'list-row w-full text-left hover:bg-raised';
+        var thumb = document.createElement('span');
+        thumb.className = 'flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-raised';
+        if (item.receipt_url) {
+          var img = document.createElement('img');
+          img.src = receiptSrc(item.receipt_url);
+          img.alt = '';
+          img.className = 'h-12 w-12 object-cover';
+          thumb.appendChild(img);
+        } else {
+          thumb.innerHTML = '<svg class="h-5 w-5 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 4.5A2.25 2.25 0 0 1 8.25 2.25h7.5L19.5 6v13.5a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5v-15A1.5 1.5 0 0 1 6 4.5Z"/><path stroke-linecap="round" d="M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg>';
+        }
+        var mid = document.createElement('span');
+        mid.className = 'min-w-0 flex-1';
+        var name = document.createElement('p');
+        name.className = 'text-body font-medium truncate';
+        name.textContent = item.name;
+        var meta = document.createElement('p');
+        meta.className = 'text-small text-muted truncate';
+        var parts = [];
+        if (item.store) parts.push(item.store);
+        if (item.purchase_date) parts.push('Purchased ' + fmtDate(item.purchase_date));
+        if (item.price_cents !== null && item.price_cents !== undefined) parts.push(fmtPrice(item.price_cents));
+        meta.textContent = parts.join(' · ');
+        mid.append(name, meta);
+        btn.append(thumb, mid, chipEl(item.status));
+        btn.addEventListener('click', function () { nav('/item/' + item.id); });
+        li.appendChild(btn);
+        return li;
+      }
+
+      function renderHome(items) {
+        var reminders = items.filter(function (i) { return i.reminder; });
+        var remSection = $('reminders');
+        var remList = $('reminders-list');
+        if (reminders.length) {
+          remList.replaceChildren.apply(remList, reminders.map(function (item) {
+            var li = document.createElement('li');
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'list-row w-full text-left hover:bg-raised';
+            var dot = document.createElement('span');
+            dot.className = 'h-2 w-2 shrink-0 rounded-full bg-warn';
+            var text = document.createElement('span');
+            text.className = 'min-w-0 flex-1 text-body truncate';
+            text.textContent = item.name + ' · ' + item.reminder.text;
+            btn.append(dot, text);
+            btn.addEventListener('click', function () { nav('/item/' + item.id); });
+            li.appendChild(btn);
+            return li;
+          }));
+          remSection.hidden = false;
+        } else {
+          remSection.hidden = true;
+        }
+
+        showHome(items.length ? 'list' : 'empty');
+        if (items.length) {
+          homeViews.list.replaceChildren.apply(homeViews.list, items.map(itemRow));
+        }
+      }
+
+      function loadHome() {
+        showHome('loading');
+        var qs = new URLSearchParams();
+        if (homeQuery.q) qs.set('q', homeQuery.q);
+        if (homeQuery.filter === 'expiring') qs.set('filter', 'expiring');
+        if (demoMode) qs.set('demo', '1');
+        var suffix = qs.toString() ? '?' + qs.toString() : '';
+        var items;
+        api('/api/items' + suffix)
+          .then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+          })
+          .then(function (body) { items = body.items; renderHome(items); })
+          .catch(function () { showHome('error'); });
+      }
+
+      var searchTimer = null;
+      $('search').addEventListener('input', function () {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(function () {
+          homeQuery.q = $('search').value.trim();
+          loadHome();
+        }, 250);
+      });
+
+      var FILTER_ON = 'chip bg-accent text-on-accent';
+      var FILTER_OFF = 'chip bg-raised text-muted';
+      function setFilter(which) {
+        homeQuery.filter = which;
+        $('filter-all').className = which === 'all' ? FILTER_ON : FILTER_OFF;
+        $('filter-all').setAttribute('aria-pressed', which === 'all' ? 'true' : 'false');
+        $('filter-expiring').className = which === 'expiring' ? FILTER_ON : FILTER_OFF;
+        $('filter-expiring').setAttribute('aria-pressed', which === 'expiring' ? 'true' : 'false');
+        loadHome();
+      }
+      $('filter-all').addEventListener('click', function () { setFilter('all'); });
+      $('filter-expiring').addEventListener('click', function () { setFilter('expiring'); });
+      $('home-retry').addEventListener('click', loadHome);
+      $('home-add').addEventListener('click', function () { nav('/add'); });
+
+      // ── Add: capture, OCR prefill, confirm ────────────────────────────
+      var WARRANTY_SUGGESTION = { electronics: 12, appliances: 24, furniture: 12, clothing: 0, other: 12 };
+      var warrantyTouched = false;
+
+      function suggestionDefaults() {
+        var months = WARRANTY_SUGGESTION[$('f-category').value];
+        if (!warrantyTouched) $('f-warranty').value = months ? String(months) : '';
+        var pd = $('f-purchase').value;
+        if (pd && !$('f-return').value) $('f-return').value = addDays(pd, 30);
+      }
+      $('f-category').addEventListener('change', suggestionDefaults);
+      $('f-warranty').addEventListener('change', function () { warrantyTouched = true; });
+      $('f-purchase').addEventListener('change', suggestionDefaults);
+
+      function note(msg) {
+        var el = $('add-note');
+        el.textContent = msg;
+        el.hidden = false;
+      }
+
+      $('photo-btn').addEventListener('click', function () { $('photo-input').click(); });
+      $('manual-btn').addEventListener('click', function () {
+        $('f-name').focus();
+        $('f-name').scrollIntoView({ block: 'center' });
+      });
+      $('photo-input').addEventListener('change', function () {
+        var file = $('photo-input').files[0];
+        $('photo-input').value = '';
+        if (file) handlePhoto(file);
+      });
+
+      // Downscale camera photos client-side before upload: platform storage
+      // takes 5 MB at most and does no resizing of its own.
+      function downscale(file) {
+        var MAX = 1600;
+        return createImageBitmap(file).then(function (bmp) {
+          var scale = Math.min(1, MAX / Math.max(bmp.width, bmp.height));
+          var canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(bmp.width * scale));
+          canvas.height = Math.max(1, Math.round(bmp.height * scale));
+          canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height);
+          return new Promise(function (resolve) {
+            canvas.toBlob(function (blob) { resolve(blob || file); }, 'image/jpeg', 0.85);
+          });
+        }).catch(function () { return file; });
+      }
+
+      function scanRequest(url) {
+        return api('/api/items/scan', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify({ receiptUrl: url }),
+        }).then(function (res) {
+          return res.json().catch(function () { return {}; }).then(function (body) {
+            if (res.ok) return { ok: true, data: body };
+            return { error: body.error || 'scan_failed' };
+          });
+        }).catch(function () { return { error: 'scan_failed' }; });
+      }
+
+      function prefill(scan) {
+        if (scan.low_confidence) $('scan-warning').hidden = false;
+        if (scan.store) $('f-store').value = scan.store;
+        if (scan.name) $('f-name').value = scan.name;
+        if (scan.purchase_date) $('f-purchase').value = scan.purchase_date;
+        if (scan.price_cents !== null && scan.price_cents !== undefined) {
+          $('f-price').value = (scan.price_cents / 100).toFixed(2);
+        }
+        suggestionDefaults();
+      }
+
+      function handlePhoto(file) {
+        $('scan-warning').hidden = true;
+        $('add-note').hidden = true;
+        $('scan-status').hidden = false;
+        var stored = null;
+        downscale(file).then(function (blob) {
+          if (window.usernode && window.usernode.uploadFile) {
+            return window.usernode.uploadFile(blob, { visibility: 'private' });
+          }
+          return null; // no platform shell: uploads unavailable here
+        }).then(function (result) {
+          stored = result;
+          $('scan-status').hidden = true;
+          if (!stored || !stored.url) {
+            note('Could not upload the photo. Fill in the details by hand.');
+            return null;
+          }
+          $('f-receipt-file-id').value = stored.id;
+          $('f-receipt-url').value = stored.url;
+          return scanRequest(stored.url).then(function (scan) {
+            if (scan.error === 'grant_required' && window.usernode &&
+                window.usernode.requestLlmAccess) {
+              return window.usernode.requestLlmAccess().then(function (grant) {
+                if (grant && grant.granted) return scanRequest(stored.url);
+                return { error: 'grant_declined' };
+              }).catch(function () { return { error: 'grant_declined' }; });
+            }
+            return scan;
+          }).then(function (scan) {
+            if (scan.ok) { prefill(scan.data); return; }
+            if (scan.error === 'app_cap_exceeded') {
+              note('Daily AI cap for this app reached, it resets at midnight UTC. Fill in the details by hand.');
+            } else if (scan.error === 'budget_exceeded') {
+              note('Your daily AI budget is spent. Fill in the details by hand.');
+            } else {
+              note('Receipt reading is not available right now. Fill in the details by hand.');
+            }
+          });
+        }).catch(function () {
+          $('scan-status').hidden = true;
+          note('Receipt reading is not available right now. Fill in the details by hand.');
         });
-        if (res.ok) loadLeaderboard();
-        else if (res.status === 401) count.textContent = 'Sign in to press!';
-      } catch {}
-    }
+      }
 
-    document.getElementById('press-btn').addEventListener('click', press);
-    document.getElementById('leaderboard-press').addEventListener('click', press);
-    document.getElementById('leaderboard-retry').addEventListener('click', () => {
-      show('loading');
-      loadLeaderboard();
-    });
+      $('add-back').addEventListener('click', function () { nav('/'); });
 
-    loadLeaderboard();
+      $('item-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var formError = $('form-error');
+        formError.hidden = true;
+        var priceRaw = $('f-price').value.replace(/[^0-9.]/g, '');
+        var priceCents = priceRaw === '' ? null : Math.round(parseFloat(priceRaw) * 100);
+        if (priceCents !== null && (Number.isNaN(priceCents) || priceCents < 0)) priceCents = null;
+        var body = {
+          name: $('f-name').value.trim(),
+          store: $('f-store').value.trim() || null,
+          purchase_date: $('f-purchase').value || null,
+          price_cents: priceCents,
+          category: $('f-category').value,
+          warranty_months: $('f-warranty').value === '' ? null : parseInt($('f-warranty').value, 10),
+          return_deadline: $('f-return').value || null,
+          serial_number: $('f-serial').value.trim() || null,
+          receipt_file_id: $('f-receipt-file-id').value || null,
+          receipt_url: $('f-receipt-url').value || null,
+        };
+        $('save-btn').disabled = true;
+        api('/api/items', { method: 'POST', body: JSON.stringify(body) })
+          .then(function (res) {
+            return res.json().catch(function () { return {}; }).then(function (out) {
+              if (res.ok && out.id) { nav('/item/' + out.id); return; }
+              if (res.status === 401) {
+                formError.textContent = 'Make an account to continue.';
+              } else {
+                formError.textContent = out.error || 'Could not save the item.';
+              }
+              formError.hidden = false;
+            });
+          })
+          .catch(function () {
+            formError.textContent = 'Could not save the item. Check your connection and try again.';
+            formError.hidden = false;
+          })
+          .then(function () { $('save-btn').disabled = false; });
+      });
+
+      // ── Item detail ───────────────────────────────────────────────────
+      var itemViews = {
+        loading: $('item-loading'),
+        error: $('item-error'),
+        notfound: $('item-notfound'),
+        card: $('item-card'),
+      };
+      function showItem(state) {
+        for (var name in itemViews) itemViews[name].hidden = name !== state;
+      }
+      var currentItem = null;
+
+      function fieldRow(label, value) {
+        var li = document.createElement('li');
+        li.className = 'list-row justify-between';
+        var l = document.createElement('span');
+        l.className = 'text-small text-muted shrink-0';
+        l.textContent = label;
+        var v = document.createElement('span');
+        v.className = 'text-body text-right min-w-0 truncate';
+        v.textContent = value;
+        li.append(l, v);
+        return li;
+      }
+
+      function renderItem(item) {
+        currentItem = item;
+        $('item-name').textContent = item.name;
+        var chip = $('item-chip');
+        var s = STATUS[item.status] || STATUS.covered;
+        chip.className = 'chip ' + s.cls;
+        chip.textContent = s.label;
+        var rem = $('item-reminder');
+        if (item.reminder) {
+          var t = item.reminder.text;
+          rem.textContent = t.charAt(0).toUpperCase() + t.slice(1);
+          rem.hidden = false;
+        } else {
+          rem.hidden = true;
+        }
+        var img = $('item-receipt');
+        if (item.receipt_url) {
+          img.src = receiptSrc(item.receipt_url);
+          img.hidden = false;
+        } else {
+          img.hidden = true;
+          img.removeAttribute('src');
+        }
+        var fields = $('item-fields');
+        var rows = [];
+        if (item.store) rows.push(fieldRow('Store', item.store));
+        if (item.purchase_date) rows.push(fieldRow('Purchased', fmtDate(item.purchase_date)));
+        if (item.price_cents !== null && item.price_cents !== undefined) {
+          rows.push(fieldRow('Price', fmtPrice(item.price_cents)));
+        }
+        rows.push(fieldRow('Category',
+          item.category.charAt(0).toUpperCase() + item.category.slice(1)));
+        rows.push(fieldRow('Warranty ends',
+          item.warranty_expires_on ? fmtDate(item.warranty_expires_on) : 'None'));
+        rows.push(fieldRow('Return deadline',
+          item.return_deadline ? fmtDate(item.return_deadline) : 'None'));
+        if (item.serial_number) rows.push(fieldRow('Serial number', item.serial_number));
+        fields.replaceChildren.apply(fields, rows);
+      }
+
+      var lastDetailId = null;
+      function loadDetail(id) {
+        lastDetailId = id;
+        showItem('loading');
+        api('/api/items/' + id + (demoMode ? '?demo=1' : ''))
+          .then(function (res) {
+            if (res.status === 404) { showItem('notfound'); return null; }
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+          })
+          .then(function (body) {
+            if (body) { renderItem(body.item); showItem('card'); }
+          })
+          .catch(function () { showItem('error'); });
+      }
+      $('item-retry').addEventListener('click', function () {
+        if (lastDetailId !== null) loadDetail(lastDetailId);
+      });
+      $('item-back').addEventListener('click', function () { nav('/'); });
+      $('item-delete').addEventListener('click', function () {
+        if (!currentItem) return;
+        if (!window.confirm('Delete this item and its receipt photo?')) return;
+        api('/api/items/' + currentItem.id, { method: 'DELETE' })
+          .then(function (res) {
+            if (res.ok) { nav('/'); return; }
+            return res.json().catch(function () { return {}; }).then(function (body) {
+              if (res.status === 401) {
+                window.alert('Make an account to continue.');
+              } else {
+                window.alert(body.error || 'Could not delete the item.');
+              }
+            });
+          })
+          .catch(function () { window.alert('Could not delete the item.'); });
+      });
+
+      route();
+    })();
   </script>
 </body>
 </html>
