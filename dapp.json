@@ -7,6 +7,8 @@
   },
   "tests": [
     { "name": "Home empty state", "path": "/", "expectText": "No items yet" },
+    { "name": "Zoom menu on Home", "path": "/", "expectSelector": "#zoom-select option[value='200']" },
+    { "name": "Zoom menu on Add", "path": "/add", "expectSelector": "#zoom-select" },
     {
       "id": "items.demo-list",
       "name": "Item list with statuses",
