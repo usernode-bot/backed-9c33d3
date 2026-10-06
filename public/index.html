@@ -271,7 +271,10 @@
           <span id="item-chip" class="chip"></span>
         </div>
         <p id="item-reminder" class="text-small font-medium text-warn" hidden></p>
-        <img id="item-receipt" class="w-full rounded-lg border border-line" alt="Receipt photo" hidden>
+        <!-- Tapping the receipt opens the fullscreen zoom viewer below. -->
+        <button type="button" id="item-receipt-open" class="block w-full cursor-zoom-in touch-manipulation" hidden>
+          <img id="item-receipt" class="w-full rounded-lg border border-line" alt="Receipt photo" hidden>
+        </button>
         <ul id="item-fields" class="list"></ul>
         <button type="button" id="item-delete" class="btn-secondary text-danger">Delete item</button>
       </div>
@@ -286,6 +289,28 @@
         <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M1.5 6.375c0-1.036.84-1.875 1.875-1.875h2.27l1.341-1.688A1.875 1.875 0 0 1 8.506 2h2.988a1.875 1.875 0 0 1 1.52.762l1.341 1.688h2.27c1.035 0 1.875.84 1.875 1.875v9.25c0 1.035-.84 1.875-1.875 1.875H3.375A1.875 1.875 0 0 1 1.5 15.625v-9.25Zm4.5 4.625a4 4 0 1 1 8 0 4 4 0 0 1-8 0Z" clip-rule="evenodd"/></svg>
         Add receipt
       </button>
+    </div>
+  </div>
+
+  <!-- ── Fullscreen receipt viewer ─────────────────────────────────────
+       Opens when the item detail photo is tapped. One hidden overlay:
+       pinch or double-tap zooms on touch, the two buttons zoom with a
+       mouse, drag pans, a tap or Escape closes. No history entry. -->
+  <div id="receipt-viewer" class="fixed inset-0 z-50 flex flex-col bg-ground" role="dialog"
+       aria-modal="true" aria-label="Receipt photo" hidden>
+    <div class="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
+      <button type="button" id="viewer-back" class="btn-secondary">Back</button>
+      <div class="flex gap-2">
+        <button type="button" id="viewer-zoom-out" class="btn-secondary" aria-label="Zoom out" disabled>
+          <svg class="h-5 w-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" d="M5 10h10"/></svg>
+        </button>
+        <button type="button" id="viewer-zoom-in" class="btn-secondary" aria-label="Zoom in">
+          <svg class="h-5 w-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" d="M10 5v10M5 10h10"/></svg>
+        </button>
+      </div>
+    </div>
+    <div id="viewer-stage" class="flex flex-1 touch-none items-center justify-center overflow-hidden">
+      <img id="viewer-img" class="max-h-full max-w-full object-contain" alt="Receipt photo" draggable="false">
     </div>
   </div>
 
@@ -703,12 +728,15 @@
           rem.hidden = true;
         }
         var img = $('item-receipt');
+        var openBtn = $('item-receipt-open');
         if (item.receipt_url) {
           img.src = receiptSrc(item.receipt_url);
           img.hidden = false;
+          openBtn.hidden = false;
         } else {
           img.hidden = true;
           img.removeAttribute('src');
+          openBtn.hidden = true;
         }
         var fields = $('item-fields');
         var rows = [];
@@ -761,6 +789,165 @@
             });
           })
           .catch(function () { window.alert('Could not delete the item.'); });
+      });
+
+      // ── Receipt viewer: fullscreen zoom on the detail photo ───────────
+      // State is one object; every change reapplies the transform. Zoom
+      // runs 1× to 4×; buttons multiply by 1.5; pinch by finger distance;
+      // double-tap toggles 1× and 2× at the tap point. Pan is clamped so
+      // the photo's edges stay reachable; at 1× it resets to centred.
+      var MAX_SCALE = 4;
+      var viewerState = { scale: 1, x: 0, y: 0 };
+      var viewerEl = $('receipt-viewer');
+      var viewerImg = $('viewer-img');
+      var viewerStage = $('viewer-stage');
+      var viewerBack = $('viewer-back');
+      var viewerZoomIn = $('viewer-zoom-in');
+      var viewerZoomOut = $('viewer-zoom-out');
+      var receiptTrigger = $('item-receipt-open');
+      var viewerOpen = false;
+      var tapTimer = null;
+
+      function applyViewer() {
+        viewerImg.style.transform =
+          'translate(' + viewerState.x + 'px, ' + viewerState.y + 'px) scale(' + viewerState.scale + ')';
+        viewerZoomIn.disabled = viewerState.scale >= MAX_SCALE;
+        viewerZoomOut.disabled = viewerState.scale <= 1;
+      }
+
+      function clampPan() {
+        if (viewerState.scale <= 1) { viewerState.x = 0; viewerState.y = 0; return; }
+        var rect = viewerStage.getBoundingClientRect();
+        var halfX = (viewerImg.offsetWidth * viewerState.scale - rect.width) / 2;
+        var halfY = (viewerImg.offsetHeight * viewerState.scale - rect.height) / 2;
+        viewerState.x = halfX > 0 ? Math.max(-halfX, Math.min(halfX, viewerState.x)) : 0;
+        viewerState.y = halfY > 0 ? Math.max(-halfY, Math.min(halfY, viewerState.y)) : 0;
+      }
+
+      // Keeps the point (px, py) fixed on screen while the scale changes.
+      function zoomAt(px, py, next) {
+        next = Math.max(1, Math.min(MAX_SCALE, next));
+        var rect = viewerStage.getBoundingClientRect();
+        viewerState.x += (viewerState.scale - next) * (px - (rect.left + rect.width / 2));
+        viewerState.y += (viewerState.scale - next) * (py - (rect.top + rect.height / 2));
+        viewerState.scale = next;
+        clampPan();
+        applyViewer();
+      }
+
+      function zoomCentered(factor) {
+        var rect = viewerStage.getBoundingClientRect();
+        zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2,
+          viewerState.scale * factor);
+      }
+
+      function cancelTap() {
+        if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; }
+      }
+
+      // A single tap closes after 250 ms; a second tap inside that window
+      // cancels the close and toggles 1× and 2× instead.
+      function handleTap(px, py) {
+        if (tapTimer) {
+          cancelTap();
+          zoomAt(px, py, viewerState.scale > 1 ? 1 : 2);
+        } else {
+          tapTimer = setTimeout(function () {
+            tapTimer = null;
+            closeViewer();
+          }, 250);
+        }
+      }
+
+      function openViewer() {
+        if (!currentItem || !currentItem.receipt_url) return;
+        viewerImg.src = receiptSrc(currentItem.receipt_url);
+        viewerState.scale = 1; viewerState.x = 0; viewerState.y = 0;
+        applyViewer();
+        viewerOpen = true;
+        viewerEl.hidden = false;
+        viewerBack.focus();
+      }
+
+      function closeViewer() {
+        cancelTap();
+        viewerOpen = false;
+        viewerEl.hidden = true;
+        viewerState.scale = 1; viewerState.x = 0; viewerState.y = 0;
+        applyViewer();
+        viewerImg.removeAttribute('src');
+        receiptTrigger.focus();
+      }
+
+      receiptTrigger.addEventListener('click', openViewer);
+      viewerBack.addEventListener('click', closeViewer);
+      viewerZoomIn.addEventListener('click', function () { zoomCentered(1.5); });
+      viewerZoomOut.addEventListener('click', function () { zoomCentered(1 / 1.5); });
+      document.addEventListener('keydown', function (e) {
+        if (viewerOpen && e.key === 'Escape') closeViewer();
+      });
+
+      // Pointer events cover touch and mouse alike: one finger pans while
+      // zoomed, two fingers pinch, a tap without movement taps.
+      var ptrs = new Map(); // pointerId → { x0, y0, x, y, moved }
+      var pinch = null;     // { d0, s0 } while two fingers are down
+
+      function pinchPts() {
+        var out = [];
+        ptrs.forEach(function (p) { out.push(p); });
+        return out;
+      }
+
+      viewerStage.addEventListener('pointerdown', function (e) {
+        if (!viewerOpen) return;
+        e.preventDefault();
+        ptrs.set(e.pointerId, { x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, moved: false });
+        if (ptrs.size === 2) {
+          cancelTap();
+          var pts = pinchPts();
+          pinch = {
+            d0: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y),
+            s0: viewerState.scale,
+          };
+        }
+        try { viewerStage.setPointerCapture(e.pointerId); } catch (_) {}
+      });
+
+      viewerStage.addEventListener('pointermove', function (e) {
+        var p = ptrs.get(e.pointerId);
+        if (!p || !viewerOpen) return;
+        var dx = e.clientX - p.x;
+        var dy = e.clientY - p.y;
+        p.x = e.clientX;
+        p.y = e.clientY;
+        if (Math.abs(e.clientX - p.x0) > 5 || Math.abs(e.clientY - p.y0) > 5) p.moved = true;
+        if (pinch && ptrs.size >= 2) {
+          var pts = pinchPts();
+          var d = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+          if (d > 0) {
+            zoomAt((pts[0].x + pts[1].x) / 2, (pts[0].y + pts[1].y) / 2,
+              pinch.s0 * (d / pinch.d0));
+          }
+        } else if (ptrs.size === 1 && viewerState.scale > 1) {
+          viewerState.x += dx;
+          viewerState.y += dy;
+          clampPan();
+          applyViewer();
+        }
+      });
+
+      function pointerDone(e) {
+        var p = ptrs.get(e.pointerId);
+        ptrs.delete(e.pointerId);
+        if (ptrs.size < 2) pinch = null;
+        if (p && viewerOpen && !p.moved && ptrs.size === 0) {
+          handleTap(e.clientX, e.clientY);
+        }
+      }
+      viewerStage.addEventListener('pointerup', pointerDone);
+      viewerStage.addEventListener('pointercancel', function (e) {
+        ptrs.delete(e.pointerId);
+        if (ptrs.size < 2) pinch = null;
       });
 
       route();

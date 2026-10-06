@@ -28,6 +28,14 @@
       "name": "Item detail renders",
       "path": "/item/900001?demo=1",
       "expectText": "Warranty ends"
+    },
+    {
+      "id": "items.receipt-zoom",
+      "name": "Receipt photo opens the zoom viewer",
+      "path": "/item/900001?demo=1",
+      "expectSelector": "#item-receipt-open:not([hidden])",
+      "visual": true,
+      "impact": ["public/**", "styles/**", "dapp.json"]
     }
   ]
 }
