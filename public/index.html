@@ -101,6 +101,17 @@
       document.documentElement.style.fontSize = pct[v] || '100%';
     })();
   </script>
+  <!-- Page zoom (the Zoom menu at the top of every screen): applied before
+       first paint so the page does not flash at 100%. CSS zoom scales the
+       whole page, layout included, on top of Text size. -->
+  <script>
+    (function () {
+      var v = '100';
+      try { v = localStorage.getItem('backed.zoom') || '100'; } catch (e) {}
+      if (['50', '75', '90', '100', '110', '125', '150', '175', '200'].indexOf(v) === -1) v = '100';
+      document.documentElement.style.zoom = v === '100' ? '' : v + '%';
+    })();
+  </script>
   <!-- Follow the viewer's Homeroom theme (the bridge reports it), with the
        OS preference as the fallback outside Homeroom. -->
   <script>
@@ -122,7 +133,25 @@
        (bg-ground, text-muted, bg-accent, ...) that are right in both looks,
        and the kit components. Three screens, one client-side router below:
        / (the item list), /add (capture + confirm), /item/<id> (detail). -->
-  <main class="mx-auto flex max-w-md flex-col gap-6 px-4 pb-32 pt-8">
+  <main class="mx-auto flex max-w-md flex-col gap-6 px-4 pb-32 pt-4">
+
+    <!-- Zoom: above every screen, so it is always reachable. -->
+    <div class="flex justify-end">
+      <label class="flex items-center gap-2">
+        <span class="text-small font-medium text-muted">Zoom</span>
+        <select id="zoom-select" class="field w-auto" aria-label="Page zoom">
+          <option value="50">50%</option>
+          <option value="75">75%</option>
+          <option value="90">90%</option>
+          <option value="100" selected>100%</option>
+          <option value="110">110%</option>
+          <option value="125">125%</option>
+          <option value="150">150%</option>
+          <option value="175">175%</option>
+          <option value="200">200%</option>
+        </select>
+      </label>
+    </div>
 
     <!-- ── Home: reminders, search, filter, the item list ─────────────── -->
     <section id="view-home" class="flex flex-col gap-6">
@@ -139,7 +168,7 @@
       <section class="flex flex-col gap-3">
         <input id="search" class="field" type="search" placeholder="Search items or stores"
                aria-label="Search items or stores" autocomplete="off">
-        <div class="flex gap-2" role="group" aria-label="Filter items">
+        <div class="flex flex-wrap gap-2" role="group" aria-label="Filter items">
           <button type="button" id="filter-all" class="chip bg-accent text-on-accent" aria-pressed="true">All</button>
           <button type="button" id="filter-expiring" class="chip bg-raised text-muted" aria-pressed="false">Expiring soon</button>
         </div>
@@ -547,6 +576,16 @@
       setScale(SCALES[savedScale] ? savedScale : 'normal', false);
       Object.keys(SCALES).forEach(function (k) {
         $('scale-' + k).addEventListener('click', function () { setScale(k, true); });
+      });
+
+      var zoomSelect = $('zoom-select');
+      var savedZoom = '100';
+      try { savedZoom = localStorage.getItem('backed.zoom') || '100'; } catch (e) {}
+      if (zoomSelect.querySelector('option[value="' + savedZoom + '"]')) zoomSelect.value = savedZoom;
+      zoomSelect.addEventListener('change', function () {
+        var v = zoomSelect.value;
+        document.documentElement.style.zoom = v === '100' ? '' : v + '%';
+        try { localStorage.setItem('backed.zoom', v); } catch (e) {}
       });
 
       function closePhoto() { $('photo-viewer').hidden = true; }
