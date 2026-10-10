@@ -30,6 +30,22 @@
       "name": "Item detail renders",
       "path": "/item/900001?demo=1",
       "expectText": "Warranty ends"
+    },
+    {
+      "id": "items.add-manual-field",
+      "name": "Manual link on Add",
+      "path": "/add",
+      "expectSelector": "#f-manual",
+      "visual": true,
+      "impact": ["public/**", "server.js", "styles/**", "dapp.json"]
+    },
+    {
+      "id": "items.demo-detail-manual",
+      "name": "Open manual on item detail",
+      "path": "/item/900001?demo=1",
+      "expectSelector": "#item-manual[href^='https://']",
+      "visual": true,
+      "impact": ["public/**", "server.js", "styles/**", "dapp.json"]
     }
   ]
 }

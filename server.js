@@ -210,20 +210,22 @@ function statusFor(item, today) {
 }
 
 // The fixed reminder schedule: warranty expiration minus 30 and minus 7
-// days (plus the day itself), return deadline minus 3 days (plus the day
-// itself). Exact day-counts only, so a reminder appears on the day it is
-// about, not as a standing state. Lowercase text; the page prefixes the
-// item name.
+// days, then minus 1 day (plus the day itself), return deadline minus 3
+// days, then minus 1 day (plus the day itself). Exact day-counts only, so
+// a reminder appears on the day it is about, not as a standing state.
+// Lowercase text; the page prefixes the item name.
 function reminderFor(item, today) {
   if (item.return_deadline) {
     const diff = daysUntil(item.return_deadline, today);
     if (diff === 3) return { kind: 'return', text: 'return window closes in 3 days' };
+    if (diff === 1) return { kind: 'return', text: 'return window closes tomorrow' };
     if (diff === 0) return { kind: 'return', text: 'return window closes today' };
   }
   if (item.warranty_expires_on) {
     const diff = daysUntil(item.warranty_expires_on, today);
     if (diff === 30) return { kind: 'warranty', text: 'warranty ends in 30 days' };
     if (diff === 7) return { kind: 'warranty', text: 'warranty ends in 7 days' };
+    if (diff === 1) return { kind: 'warranty', text: 'warranty ends tomorrow' };
     if (diff === 0) return { kind: 'warranty', text: 'warranty expires today' };
   }
   return null;
@@ -243,7 +245,7 @@ const ITEM_COLUMNS = `
   price_cents, warranty_months,
   warranty_expires_on::text AS warranty_expires_on,
   return_deadline::text AS return_deadline,
-  serial_number, receipt_file_id, receipt_url, created_at
+  serial_number, manual_url, receipt_file_id, receipt_url, created_at
 `;
 
 /* ── Staging demo data ────────────────────────────────────────────────────
@@ -287,6 +289,7 @@ function demoItems(today) {
       warranty_expires_on: r(7),   // hits the 7-day warranty reminder
       return_deadline: r(-307),
       serial_number: 'SD-DRILL-0042',
+      manual_url: 'https://example.com/staging-demo-drill-manual.pdf',
       receipt_file_id: null,
       receipt_url: demoReceipt('Staging demo drill'),
     },
@@ -301,6 +304,7 @@ function demoItems(today) {
       warranty_expires_on: r(338),
       return_deadline: r(3),       // hits the 3-day return reminder
       serial_number: null,
+      manual_url: null,
       receipt_file_id: null,
       receipt_url: demoReceipt('Staging demo espresso'),
     },
@@ -315,6 +319,7 @@ function demoItems(today) {
       warranty_expires_on: r(301), // comfortably covered
       return_deadline: r(-34),
       serial_number: null,
+      manual_url: null,
       receipt_file_id: null,
       receipt_url: null,
     },
@@ -329,6 +334,7 @@ function demoItems(today) {
       warranty_expires_on: r(-60), // expired, quiet
       return_deadline: r(-395),
       serial_number: null,
+      manual_url: null,
       receipt_file_id: null,
       receipt_url: null,
     },
@@ -343,6 +349,7 @@ function demoItems(today) {
       warranty_expires_on: null,
       return_deadline: r(10),
       serial_number: null,
+      manual_url: null,
       receipt_file_id: null,
       receipt_url: null,
     },
@@ -433,12 +440,33 @@ app.post('/api/items', async (req, res) => {
     const warrantyExpires = purchase && months ? addMonths(purchase, months) : null;
     const returnDeadline = DATE_RE.test(b.return_deadline || '') ? b.return_deadline : null;
 
+    // Optional product manual link. Must be a real web address with an
+    // http(s) scheme, so it can never run anything inside Backed; the
+    // stored value is the trimmed input as typed. The page shows the error
+    // text in #form-error, so it doubles as the message a person sees.
+    let manualUrl = null;
+    if (typeof b.manual_url === 'string' && b.manual_url.trim() !== '') {
+      const raw = b.manual_url.trim();
+      if (raw.length > 2048) {
+        return res.status(400).json({ error: 'Manual link must be a web address starting with https://' });
+      }
+      try {
+        const parsed = new URL(raw);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          throw new Error('bad scheme');
+        }
+        manualUrl = raw;
+      } catch {
+        return res.status(400).json({ error: 'Manual link must be a web address starting with https://' });
+      }
+    }
+
     const { rows } = await pool.query(`
       INSERT INTO items
         (user_id, username, name, category, store, purchase_date, price_cents,
          warranty_months, warranty_expires_on, return_deadline, serial_number,
-         receipt_file_id, receipt_url)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         manual_url, receipt_file_id, receipt_url)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING id
     `, [
       req.user.id, req.user.username, name, category,
@@ -449,6 +477,7 @@ app.post('/api/items', async (req, res) => {
       warrantyExpires,
       returnDeadline,
       (b.serial_number && String(b.serial_number).trim()) || null,
+      manualUrl,
       typeof b.receipt_file_id === 'string' ? b.receipt_file_id : null,
       typeof b.receipt_url === 'string' ? b.receipt_url : null,
     ]);
@@ -633,6 +662,9 @@ async function start() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `);
+  // Appended later than the CREATE TABLE above; older databases get the
+  // column on their next boot. Existing rows read as NULL, no backfill.
+  await pool.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS manual_url TEXT`);
   await pool.query(`COMMENT ON TABLE items IS 'staging:private'`);
   const server = app.listen(port, () => console.log(`Listening on :${port}`));
   // Let Envoy retire idle upstream connections at 60s, with a 15s margin.

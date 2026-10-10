@@ -284,6 +284,11 @@
           <span class="text-small font-medium">Serial number</span>
           <input id="f-serial" class="field" maxlength="120" autocomplete="off" placeholder="Optional">
         </label>
+        <label class="flex flex-col gap-1.5">
+          <span class="text-small font-medium">Manual link</span>
+          <input id="f-manual" class="field" type="url" inputmode="url" maxlength="2048"
+                 autocomplete="off" placeholder="Optional, https://…">
+        </label>
         <p id="form-error" class="text-small text-danger" hidden></p>
         <button type="submit" id="save-btn" class="btn-primary">Save item</button>
       </form>
@@ -323,6 +328,7 @@
           <img id="item-receipt" class="w-full rounded-lg border border-line" alt="Receipt photo">
         </button>
         <ul id="item-fields" class="list"></ul>
+        <a id="item-manual" class="btn-secondary" target="_blank" rel="noopener noreferrer" hidden>Open manual</a>
         <button type="button" id="item-delete" class="btn-secondary text-danger">Delete item</button>
       </div>
     </section>
@@ -731,6 +737,7 @@
           warranty_months: $('f-warranty').value === '' ? null : parseInt($('f-warranty').value, 10),
           return_deadline: $('f-return').value || null,
           serial_number: $('f-serial').value.trim() || null,
+          manual_url: $('f-manual').value.trim() || null,
           receipt_file_id: $('f-receipt-file-id').value || null,
           receipt_url: $('f-receipt-url').value || null,
         };
@@ -817,6 +824,14 @@
           item.return_deadline ? fmtDate(item.return_deadline) : 'None'));
         if (item.serial_number) rows.push(fieldRow('Serial number', item.serial_number));
         fields.replaceChildren.apply(fields, rows);
+        var manual = $('item-manual');
+        if (item.manual_url && /^https?:\/\//i.test(item.manual_url)) {
+          manual.href = item.manual_url;
+          manual.hidden = false;
+        } else {
+          manual.hidden = true;
+          manual.removeAttribute('href');
+        }
       }
 
       var lastDetailId = null;
