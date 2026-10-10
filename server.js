@@ -193,6 +193,8 @@ function addMonths(dateStr, m) {
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const CATEGORIES = ['electronics', 'appliances', 'furniture', 'clothing', 'other'];
+const LANGUAGES = ['english', 'spanish', 'french', 'german', 'italian',
+  'portuguese', 'japanese', 'korean', 'chinese', 'other'];
 
 /* ── Status and reminders ─────────────────────────────────────────────────
  * Status is computed at read time from the row's dates against req.now,
@@ -243,7 +245,7 @@ const ITEM_COLUMNS = `
   price_cents, warranty_months,
   warranty_expires_on::text AS warranty_expires_on,
   return_deadline::text AS return_deadline,
-  serial_number, receipt_file_id, receipt_url, created_at
+  serial_number, receipt_language, receipt_file_id, receipt_url, created_at
 `;
 
 /* ── Staging demo data ────────────────────────────────────────────────────
@@ -287,6 +289,7 @@ function demoItems(today) {
       warranty_expires_on: r(7),   // hits the 7-day warranty reminder
       return_deadline: r(-307),
       serial_number: 'SD-DRILL-0042',
+      receipt_language: 'english',
       receipt_file_id: null,
       receipt_url: demoReceipt('Staging demo drill'),
     },
@@ -301,6 +304,7 @@ function demoItems(today) {
       warranty_expires_on: r(338),
       return_deadline: r(3),       // hits the 3-day return reminder
       serial_number: null,
+      receipt_language: 'japanese',
       receipt_file_id: null,
       receipt_url: demoReceipt('Staging demo espresso'),
     },
@@ -315,6 +319,7 @@ function demoItems(today) {
       warranty_expires_on: r(301), // comfortably covered
       return_deadline: r(-34),
       serial_number: null,
+      receipt_language: null,
       receipt_file_id: null,
       receipt_url: null,
     },
@@ -329,6 +334,7 @@ function demoItems(today) {
       warranty_expires_on: r(-60), // expired, quiet
       return_deadline: r(-395),
       serial_number: null,
+      receipt_language: null,
       receipt_file_id: null,
       receipt_url: null,
     },
@@ -343,6 +349,7 @@ function demoItems(today) {
       warranty_expires_on: null,
       return_deadline: r(10),
       serial_number: null,
+      receipt_language: null,
       receipt_file_id: null,
       receipt_url: null,
     },
@@ -432,13 +439,15 @@ app.post('/api/items', async (req, res) => {
     // The warranty end date is decided once, at save time.
     const warrantyExpires = purchase && months ? addMonths(purchase, months) : null;
     const returnDeadline = DATE_RE.test(b.return_deadline || '') ? b.return_deadline : null;
+    // Optional like serial_number: an unknown value is stored as NULL, never an error.
+    const language = LANGUAGES.includes(b.receipt_language) ? b.receipt_language : null;
 
     const { rows } = await pool.query(`
       INSERT INTO items
         (user_id, username, name, category, store, purchase_date, price_cents,
          warranty_months, warranty_expires_on, return_deadline, serial_number,
-         receipt_file_id, receipt_url)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         receipt_language, receipt_file_id, receipt_url)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING id
     `, [
       req.user.id, req.user.username, name, category,
@@ -449,6 +458,7 @@ app.post('/api/items', async (req, res) => {
       warrantyExpires,
       returnDeadline,
       (b.serial_number && String(b.serial_number).trim()) || null,
+      language,
       typeof b.receipt_file_id === 'string' ? b.receipt_file_id : null,
       typeof b.receipt_url === 'string' ? b.receipt_url : null,
     ]);
@@ -496,15 +506,19 @@ app.delete('/api/items/:id', async (req, res) => {
 // LLM proxy, billed to the user's own grant. Stateless: it never writes.
 const OCR_PROMPT = `You read receipt photos for Backed, a warranty tracker. ` +
   `Extract from this receipt photo: the store name, the item name (the main ` +
-  `product bought), the purchase date, and the total price paid.\n` +
+  `product bought, translated into English if the receipt is printed in ` +
+  `another language), the purchase date, the total price paid, and the ` +
+  `language the receipt is printed in.\n` +
   `Reply with ONLY a JSON object, no other text:\n` +
   `{"store": string or null, "item_name": string or null, ` +
   `"purchase_date": "YYYY-MM-DD" or null, "price_cents": integer or null, ` +
+  `"language": lowercase English language name or null, ` +
   `"low_confidence": boolean}\n` +
   `Set low_confidence true when the photo is faded, blurry, or any value is ` +
-  `a guess or missing. If the image is not a readable receipt, return all ` +
-  `nulls with low_confidence true. Decline and return nulls if the content ` +
-  `is sexual, violent, gambling-related or otherwise disallowed.`;
+  `a guess or missing, or the language is unclear. If the image is not a ` +
+  `readable receipt, return all nulls with low_confidence true. Decline and ` +
+  `return nulls if the content is sexual, violent, gambling-related or ` +
+  `otherwise disallowed.`;
 
 function parseScanJson(text) {
   const start = text.indexOf('{');
@@ -567,6 +581,10 @@ app.post('/api/items/scan', async (req, res) => {
       price_cents: Number.isInteger(parsed.price_cents) && parsed.price_cents >= 0
         ? parsed.price_cents : null,
       low_confidence: parsed.low_confidence === true,
+      // Free string on purpose: the form, not the server, snaps it to the
+      // fixed language list, so an unusual detection still prefills "Other".
+      language: typeof parsed.language === 'string' && parsed.language.trim()
+        ? parsed.language.trim().toLowerCase() : null,
     });
   } catch (err) {
     console.error('POST /api/items/scan failed:', err.message);
@@ -634,6 +652,11 @@ async function start() {
     )
   `);
   await pool.query(`COMMENT ON TABLE items IS 'staging:private'`);
+  // CREATE TABLE IF NOT EXISTS does not extend a table that already exists:
+  // add the language column for deployments created before it (idempotent).
+  await pool.query(
+    `ALTER TABLE items ADD COLUMN IF NOT EXISTS receipt_language TEXT`
+  );
   const server = app.listen(port, () => console.log(`Listening on :${port}`));
   // Let Envoy retire idle upstream connections at 60s, with a 15s margin.
   server.keepAliveTimeout = 75_000;

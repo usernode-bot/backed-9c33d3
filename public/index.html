@@ -219,6 +219,22 @@
           </select>
         </label>
         <label class="flex flex-col gap-1.5">
+          <span class="text-small font-medium">Receipt language</span>
+          <select id="f-language" class="field">
+            <option value="" selected>Not set</option>
+            <option value="english">English</option>
+            <option value="spanish">Spanish</option>
+            <option value="french">French</option>
+            <option value="german">German</option>
+            <option value="italian">Italian</option>
+            <option value="portuguese">Portuguese</option>
+            <option value="japanese">Japanese</option>
+            <option value="korean">Korean</option>
+            <option value="chinese">Chinese</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label class="flex flex-col gap-1.5">
           <span class="text-small font-medium">Warranty</span>
           <select id="f-warranty" class="field">
             <option value="">No warranty</option>
@@ -574,6 +590,17 @@
         if (scan.price_cents !== null && scan.price_cents !== undefined) {
           $('f-price').value = (scan.price_cents / 100).toFixed(2);
         }
+        // Only prefill when the user has not picked one themselves; a language
+        // outside the fixed list lands on "Other" rather than being dropped.
+        if (scan.language && !$('f-language').value) {
+          var lang = String(scan.language).toLowerCase();
+          var known = false;
+          var opts = $('f-language').options;
+          for (var i = 0; i < opts.length; i++) {
+            if (opts[i].value === lang) { known = true; break; }
+          }
+          $('f-language').value = known ? lang : 'other';
+        }
         suggestionDefaults();
       }
 
@@ -639,6 +666,7 @@
           warranty_months: $('f-warranty').value === '' ? null : parseInt($('f-warranty').value, 10),
           return_deadline: $('f-return').value || null,
           serial_number: $('f-serial').value.trim() || null,
+          receipt_language: $('f-language').value || null,
           receipt_file_id: $('f-receipt-file-id').value || null,
           receipt_url: $('f-receipt-url').value || null,
         };
@@ -723,6 +751,10 @@
           item.warranty_expires_on ? fmtDate(item.warranty_expires_on) : 'None'));
         rows.push(fieldRow('Return deadline',
           item.return_deadline ? fmtDate(item.return_deadline) : 'None'));
+        if (item.receipt_language) {
+          rows.push(fieldRow('Receipt language',
+            item.receipt_language.charAt(0).toUpperCase() + item.receipt_language.slice(1)));
+        }
         if (item.serial_number) rows.push(fieldRow('Serial number', item.serial_number));
         fields.replaceChildren.apply(fields, rows);
       }
