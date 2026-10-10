@@ -66,9 +66,10 @@ store, item name, purchase date and price, the user confirms on one screen
 (correct anything wrong, pick a category, approve the suggested warranty
 length) and saves an item card. The item list carries a color-coded status
 per item — Return window, Warranty ending soon, Covered, Expired — plus
-search, an "Expiring soon" filter, and fixed-schedule reminders (30 and 7
-days before warranty expiration, 3 days before the return deadline),
-delivered in-app: a Reminders section on Home and a line on the item detail.
+search, an "Expiring soon" filter, and fixed-schedule reminders (30, 7 and
+1 day before warranty expiration, 3 days and 1 day before the return
+deadline), delivered in-app: a Reminders section on Home and a line on the
+item detail.
 
 MVP scope decisions made with the user: one receipt creates one item card;
 reminders are in-app only (no notification channel exists on the platform);
@@ -118,7 +119,7 @@ Re-theme by changing the token values there, keeping every text pair at
 - **Status is computed at read time**, never stored: return window open →
   return-window; warranty ended → expired; ends within 30 days →
   expiring-soon; else covered. Reminders fire on exact day-counts only
-  (30, 7, 0 for warranty; 3, 0 for returns).
+  (30, 7, 1, 0 for warranty; 3, 1, 0 for returns).
 - **Receipt photos are stored platform-side** (`usernode.uploadFile`,
   `visibility: 'private'`); the DB keeps only `receipt_url` +
   `receipt_file_id`, never image bytes.

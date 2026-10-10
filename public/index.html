@@ -238,6 +238,8 @@
       <form id="item-form" class="flex flex-col gap-4" novalidate>
         <input type="hidden" id="f-receipt-file-id">
         <input type="hidden" id="f-receipt-url">
+        <input type="hidden" id="f-manual-file-id">
+        <input type="hidden" id="f-manual-file-url">
         <label class="flex flex-col gap-1.5">
           <span class="text-small font-medium">Item name</span>
           <input id="f-name" class="field" maxlength="120" autocomplete="off">
@@ -280,14 +282,21 @@
           <span class="text-small font-medium">Return deadline</span>
           <input id="f-return" class="field" type="date">
         </label>
+        <div class="flex flex-col gap-3">
+          <label class="flex flex-col gap-1.5">
+            <span class="text-small font-medium">Manual</span>
+            <input id="f-manual-url" class="field" type="url" maxlength="500"
+                   autocomplete="off" placeholder="Link to the manual (optional)">
+          </label>
+          <!-- Only shown where platform file storage exists (the shell's
+               usernode.uploadFile); hidden elsewhere, link entry still works. -->
+          <button type="button" id="manual-pdf-btn" class="btn-secondary" hidden>Attach PDF</button>
+          <input id="manual-pdf-input" type="file" accept="application/pdf" hidden>
+          <p id="manual-pdf-name" class="text-small text-muted truncate" hidden></p>
+        </div>
         <label class="flex flex-col gap-1.5">
           <span class="text-small font-medium">Serial number</span>
           <input id="f-serial" class="field" maxlength="120" autocomplete="off" placeholder="Optional">
-        </label>
-        <label class="flex flex-col gap-1.5">
-          <span class="text-small font-medium">Manual link</span>
-          <input id="f-manual" class="field" type="url" inputmode="url" maxlength="2048"
-                 autocomplete="off" placeholder="Optional, https://…">
         </label>
         <p id="form-error" class="text-small text-danger" hidden></p>
         <button type="submit" id="save-btn" class="btn-primary">Save item</button>
@@ -328,7 +337,6 @@
           <img id="item-receipt" class="w-full rounded-lg border border-line" alt="Receipt photo">
         </button>
         <ul id="item-fields" class="list"></ul>
-        <a id="item-manual" class="btn-secondary" target="_blank" rel="noopener noreferrer" hidden>Open manual</a>
         <button type="button" id="item-delete" class="btn-secondary text-danger">Delete item</button>
       </div>
     </section>
@@ -636,6 +644,37 @@
         if (file) handlePhoto(file);
       });
 
+      // Manual PDF: the same private platform storage as receipt photos, no
+      // client-side downscale (PDFs are not images). The button only exists
+      // where the shell can upload; the link field works everywhere.
+      var manualPdfBtn = $('manual-pdf-btn');
+      if (window.usernode && window.usernode.uploadFile) manualPdfBtn.hidden = false;
+      manualPdfBtn.addEventListener('click', function () { $('manual-pdf-input').click(); });
+      $('manual-pdf-input').addEventListener('change', function () {
+        var file = $('manual-pdf-input').files[0];
+        $('manual-pdf-input').value = '';
+        if (!file) return;
+        var nameEl = $('manual-pdf-name');
+        if (file.size > 5 * 1024 * 1024) {
+          nameEl.textContent = 'That PDF is over 5 MB. Try a smaller one, or paste a link instead.';
+          nameEl.hidden = false;
+          return;
+        }
+        nameEl.textContent = 'Attaching ' + file.name + '…';
+        nameEl.hidden = false;
+        window.usernode.uploadFile(file, { visibility: 'private' }).then(function (stored) {
+          if (!stored || !stored.url) {
+            nameEl.textContent = 'Could not attach the PDF. Paste a link instead.';
+            return;
+          }
+          $('f-manual-file-id').value = stored.id;
+          $('f-manual-file-url').value = stored.url;
+          nameEl.textContent = 'Attached: ' + file.name;
+        }).catch(function () {
+          nameEl.textContent = 'Could not attach the PDF. Paste a link instead.';
+        });
+      });
+
       // Downscale camera photos client-side before upload: platform storage
       // takes 5 MB at most and does no resizing of its own.
       function downscale(file) {
@@ -737,9 +776,11 @@
           warranty_months: $('f-warranty').value === '' ? null : parseInt($('f-warranty').value, 10),
           return_deadline: $('f-return').value || null,
           serial_number: $('f-serial').value.trim() || null,
-          manual_url: $('f-manual').value.trim() || null,
           receipt_file_id: $('f-receipt-file-id').value || null,
           receipt_url: $('f-receipt-url').value || null,
+          manual_url: $('f-manual-url').value.trim() || null,
+          manual_file_id: $('f-manual-file-id').value || null,
+          manual_file_url: $('f-manual-file-url').value || null,
         };
         $('save-btn').disabled = true;
         api('/api/items', { method: 'POST', body: JSON.stringify(body) })
@@ -786,6 +827,40 @@
         return li;
       }
 
+      // Countdown wording, from the day counts the server computes at read
+      // time. A link row renders an anchor; the href is only ever set from a
+      // value the server validated as http(s), and manualFile links (stored
+      // platform-side) carry the access token like receipt photos do.
+      function countdownPhrase(n, kind) {
+        if (n === null || n === undefined) return '';
+        if (n > 1) return n + ' days left';
+        if (n === 1) return '1 day left';
+        if (n === 0) return kind === 'return' ? 'closes today' : 'ends today';
+        return (kind === 'return' ? 'closed ' : 'expired ') + (-n) + ' days ago';
+      }
+      function deadlineText(date, n, kind) {
+        if (!date) return 'None';
+        var phrase = countdownPhrase(n, kind);
+        return phrase ? fmtDate(date) + ' · ' + phrase : fmtDate(date);
+      }
+      function linkRow(label, text, url, withToken) {
+        var li = document.createElement('li');
+        li.className = 'list-row justify-between';
+        var l = document.createElement('span');
+        l.className = 'text-small text-muted shrink-0';
+        l.textContent = label;
+        var a = document.createElement('a');
+        a.className = 'text-body text-right min-w-0 truncate text-accent underline';
+        if (/^https?:\/\//.test(url || '')) {
+          a.href = withToken ? receiptSrc(url) : url;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+        }
+        a.textContent = text;
+        li.append(l, a);
+        return li;
+      }
+
       function renderItem(item) {
         currentItem = item;
         $('item-name').textContent = item.name;
@@ -819,19 +894,13 @@
         rows.push(fieldRow('Category',
           item.category.charAt(0).toUpperCase() + item.category.slice(1)));
         rows.push(fieldRow('Warranty ends',
-          item.warranty_expires_on ? fmtDate(item.warranty_expires_on) : 'None'));
+          deadlineText(item.warranty_expires_on, item.warranty_days_left, 'warranty')));
         rows.push(fieldRow('Return deadline',
-          item.return_deadline ? fmtDate(item.return_deadline) : 'None'));
+          deadlineText(item.return_deadline, item.return_days_left, 'return')));
+        if (item.manual_file_url) rows.push(linkRow('Manual', 'Open PDF', item.manual_file_url, true));
+        if (item.manual_url) rows.push(linkRow('Manual', 'Open manual', item.manual_url, false));
         if (item.serial_number) rows.push(fieldRow('Serial number', item.serial_number));
         fields.replaceChildren.apply(fields, rows);
-        var manual = $('item-manual');
-        if (item.manual_url && /^https?:\/\//i.test(item.manual_url)) {
-          manual.href = item.manual_url;
-          manual.hidden = false;
-        } else {
-          manual.hidden = true;
-          manual.removeAttribute('href');
-        }
       }
 
       var lastDetailId = null;
