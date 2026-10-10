@@ -209,30 +209,40 @@ function statusFor(item, today) {
   return 'covered';
 }
 
-// The fixed reminder schedule: warranty expiration minus 30 and minus 7
-// days (plus the day itself), return deadline minus 3 days (plus the day
+// The fixed reminder schedule: warranty expiration minus 30, 7 and 1 days
+// (plus the day itself), return deadline minus 3 and 1 days (plus the day
 // itself). Exact day-counts only, so a reminder appears on the day it is
 // about, not as a standing state. Lowercase text; the page prefixes the
-// item name.
+// item name. At most one line per item: when both deadlines qualify the
+// same day, the return deadline wins — it is the action with a clock on it.
 function reminderFor(item, today) {
   if (item.return_deadline) {
     const diff = daysUntil(item.return_deadline, today);
     if (diff === 3) return { kind: 'return', text: 'return window closes in 3 days' };
+    if (diff === 1) return { kind: 'return', text: 'return window closes tomorrow' };
     if (diff === 0) return { kind: 'return', text: 'return window closes today' };
   }
   if (item.warranty_expires_on) {
     const diff = daysUntil(item.warranty_expires_on, today);
     if (diff === 30) return { kind: 'warranty', text: 'warranty ends in 30 days' };
     if (diff === 7) return { kind: 'warranty', text: 'warranty ends in 7 days' };
+    if (diff === 1) return { kind: 'warranty', text: 'warranty ends tomorrow' };
     if (diff === 0) return { kind: 'warranty', text: 'warranty expires today' };
   }
   return null;
 }
 
+// Countdown, computed at read time like the status, never stored: whole days
+// until each deadline, null when the item has none. The page turns the
+// number into the wording.
 function presentItem(row, today) {
   const item = { ...row };
   item.status = statusFor(item, today);
   item.reminder = reminderFor(item, today);
+  item.warranty_days_left = item.warranty_expires_on
+    ? daysUntil(item.warranty_expires_on, today) : null;
+  item.return_days_left = item.return_deadline
+    ? daysUntil(item.return_deadline, today) : null;
   return item;
 }
 
@@ -243,7 +253,8 @@ const ITEM_COLUMNS = `
   price_cents, warranty_months,
   warranty_expires_on::text AS warranty_expires_on,
   return_deadline::text AS return_deadline,
-  serial_number, receipt_file_id, receipt_url, created_at
+  serial_number, receipt_file_id, receipt_url,
+  manual_url, manual_file_id, manual_file_url, created_at
 `;
 
 /* ── Staging demo data ────────────────────────────────────────────────────
@@ -278,73 +289,88 @@ function demoItems(today) {
   return [
     {
       id: 900001,
-      name: 'Staging demo cordless drill',
+      name: 'Staging demo phone',
       category: 'electronics',
-      store: 'Staging demo hardware store',
-      purchase_date: r(-337),
-      price_cents: 12999,
-      warranty_months: 12,
-      warranty_expires_on: r(7),   // hits the 7-day warranty reminder
-      return_deadline: r(-307),
-      serial_number: 'SD-DRILL-0042',
-      receipt_file_id: null,
-      receipt_url: demoReceipt('Staging demo drill'),
-    },
-    {
-      id: 900002,
-      name: 'Staging demo espresso machine',
-      category: 'appliances',
-      store: 'Staging demo kitchen store',
+      store: 'Staging demo phone shop',
       purchase_date: r(-27),
-      price_cents: 49900,
+      price_cents: 69900,
       warranty_months: 12,
       warranty_expires_on: r(338),
       return_deadline: r(3),       // hits the 3-day return reminder
+      serial_number: 'SD-PHONE-0042',
+      receipt_file_id: null,
+      receipt_url: demoReceipt('Staging demo phone'),
+      manual_url: null,
+      manual_file_id: null,
+      manual_file_url: null,
+    },
+    {
+      id: 900002,
+      name: 'Staging demo rice cooker',
+      category: 'appliances',
+      store: 'Staging demo home store',
+      purchase_date: r(-342),
+      price_cents: 8900,
+      warranty_months: 12,
+      warranty_expires_on: r(23),  // "Warranty ending soon", quiet
+      return_deadline: r(-312),
       serial_number: null,
       receipt_file_id: null,
-      receipt_url: demoReceipt('Staging demo espresso'),
+      receipt_url: null,
+      manual_url: null,
+      manual_file_id: null,
+      manual_file_url: null,
     },
     {
       id: 900003,
-      name: 'Staging demo desk lamp',
-      category: 'furniture',
-      store: 'Staging demo home store',
-      purchase_date: r(-64),
-      price_cents: 4550,
-      warranty_months: 12,
-      warranty_expires_on: r(301), // comfortably covered
-      return_deadline: r(-34),
+      name: 'Staging demo fridge',
+      category: 'appliances',
+      store: 'Staging demo appliance store',
+      purchase_date: r(-370),
+      price_cents: 129900,
+      warranty_months: 24,
+      warranty_expires_on: r(360), // comfortably covered
+      return_deadline: r(-340),
       serial_number: null,
       receipt_file_id: null,
       receipt_url: null,
+      manual_url: null,
+      manual_file_id: null,
+      manual_file_url: null,
     },
     {
       id: 900004,
-      name: 'Staging demo winter jacket',
-      category: 'clothing',
-      store: 'Staging demo outdoors store',
-      purchase_date: r(-425),
-      price_cents: 18900,
+      name: 'Staging demo laptop',
+      category: 'electronics',
+      store: 'Staging demo computer store',
+      purchase_date: r(-358),
+      price_cents: 149900,
       warranty_months: 12,
-      warranty_expires_on: r(-60), // expired, quiet
-      return_deadline: r(-395),
+      warranty_expires_on: r(7),   // "Warranty ending soon" + 7-day reminder
+      return_deadline: r(-328),
       serial_number: null,
       receipt_file_id: null,
-      receipt_url: null,
+      receipt_url: demoReceipt('Staging demo laptop'),
+      manual_url: 'https://example.com/staging-demo-laptop-manual',
+      manual_file_id: null,
+      manual_file_url: null,
     },
     {
       id: 900005,
-      name: 'Staging demo yoga mat',
-      category: 'other',
-      store: 'Staging demo sports store',
-      purchase_date: r(-20),
-      price_cents: 3200,
-      warranty_months: null,       // no warranty: return-window-only item
-      warranty_expires_on: null,
-      return_deadline: r(10),
+      name: 'Staging demo headphones',
+      category: 'electronics',
+      store: 'Staging demo electronics store',
+      purchase_date: r(-400),
+      price_cents: 24900,
+      warranty_months: 12,
+      warranty_expires_on: r(-35), // expired, quiet
+      return_deadline: r(-370),
       serial_number: null,
       receipt_file_id: null,
       receipt_url: null,
+      manual_url: null,
+      manual_file_id: null,
+      manual_file_url: null,
     },
   ];
 }
@@ -432,13 +458,23 @@ app.post('/api/items', async (req, res) => {
     // The warranty end date is decided once, at save time.
     const warrantyExpires = purchase && months ? addMonths(purchase, months) : null;
     const returnDeadline = DATE_RE.test(b.return_deadline || '') ? b.return_deadline : null;
+    // A manual link must be a real web address: it is rendered as an href,
+    // so anything that is not http(s) is refused rather than stored.
+    let manualUrl = null;
+    if (typeof b.manual_url === 'string' && b.manual_url.trim()) {
+      const trimmed = b.manual_url.trim();
+      if (!/^https?:\/\//.test(trimmed)) {
+        return res.status(400).json({ error: 'Manual link must start with http:// or https://' });
+      }
+      manualUrl = trimmed;
+    }
 
     const { rows } = await pool.query(`
       INSERT INTO items
         (user_id, username, name, category, store, purchase_date, price_cents,
          warranty_months, warranty_expires_on, return_deadline, serial_number,
-         receipt_file_id, receipt_url)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         receipt_file_id, receipt_url, manual_url, manual_file_id, manual_file_url)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       RETURNING id
     `, [
       req.user.id, req.user.username, name, category,
@@ -451,6 +487,9 @@ app.post('/api/items', async (req, res) => {
       (b.serial_number && String(b.serial_number).trim()) || null,
       typeof b.receipt_file_id === 'string' ? b.receipt_file_id : null,
       typeof b.receipt_url === 'string' ? b.receipt_url : null,
+      manualUrl,
+      typeof b.manual_file_id === 'string' ? b.manual_file_id : null,
+      typeof b.manual_file_url === 'string' ? b.manual_file_url : null,
     ]);
     res.json({ ok: true, id: rows[0].id });
   } catch (err) {
@@ -464,14 +503,14 @@ app.delete('/api/items/:id', async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return res.status(404).json({ error: 'Item not found' });
     const { rows } = await pool.query(
-      `DELETE FROM items WHERE id = $1 AND user_id = $2 RETURNING receipt_file_id`,
+      `DELETE FROM items WHERE id = $1 AND user_id = $2 RETURNING receipt_file_id, manual_file_id`,
       [id, req.user.id]
     );
     if (!rows.length) return res.status(404).json({ error: 'Item not found' });
-    // Best effort: remove the stored receipt too. A storage failure must not
-    // block the item delete — the row is already gone.
-    const fileId = rows[0].receipt_file_id;
-    if (fileId && STORAGE_ENABLED) {
+    // Best effort: remove the stored receipt and manual PDF too. A storage
+    // failure must not block the item delete — the row is already gone.
+    for (const fileId of [rows[0].receipt_file_id, rows[0].manual_file_id]) {
+      if (!fileId || !STORAGE_ENABLED) continue;
       try {
         await fetch(`${process.env.USERNODE_STORAGE_URL}/files/${encodeURIComponent(fileId)}`, {
           method: 'DELETE',
@@ -481,7 +520,7 @@ app.delete('/api/items/:id', async (req, res) => {
           },
         });
       } catch (err) {
-        console.warn('receipt delete failed:', err.message);
+        console.warn('stored file delete failed:', err.message);
       }
     }
     res.json({ ok: true });
@@ -633,6 +672,12 @@ async function start() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `);
+  // Columns added after the table's first release: CREATE TABLE IF NOT
+  // EXISTS is a no-op on the existing production table, so the new columns
+  // need their own idempotent migration.
+  await pool.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS manual_url TEXT`);
+  await pool.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS manual_file_id TEXT`);
+  await pool.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS manual_file_url TEXT`);
   await pool.query(`COMMENT ON TABLE items IS 'staging:private'`);
   const server = app.listen(port, () => console.log(`Listening on :${port}`));
   // Let Envoy retire idle upstream connections at 60s, with a 15s margin.
