@@ -458,15 +458,25 @@ app.post('/api/items', async (req, res) => {
     // The warranty end date is decided once, at save time.
     const warrantyExpires = purchase && months ? addMonths(purchase, months) : null;
     const returnDeadline = DATE_RE.test(b.return_deadline || '') ? b.return_deadline : null;
-    // A manual link must be a real web address: it is rendered as an href,
-    // so anything that is not http(s) is refused rather than stored.
+    // Optional product manual link. Must be a real web address with an
+    // http(s) scheme, so it can never run anything inside Backed; the
+    // stored value is the trimmed input as typed. The page shows the error
+    // text in #form-error, so it doubles as the message a person sees.
     let manualUrl = null;
-    if (typeof b.manual_url === 'string' && b.manual_url.trim()) {
-      const trimmed = b.manual_url.trim();
-      if (!/^https?:\/\//.test(trimmed)) {
-        return res.status(400).json({ error: 'Manual link must start with http:// or https://' });
+    if (typeof b.manual_url === 'string' && b.manual_url.trim() !== '') {
+      const raw = b.manual_url.trim();
+      if (raw.length > 2048) {
+        return res.status(400).json({ error: 'Manual link must be a web address starting with https://' });
       }
-      manualUrl = trimmed;
+      try {
+        const parsed = new URL(raw);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          throw new Error('bad scheme');
+        }
+        manualUrl = raw;
+      } catch {
+        return res.status(400).json({ error: 'Manual link must be a web address starting with https://' });
+      }
     }
 
     const { rows } = await pool.query(`
