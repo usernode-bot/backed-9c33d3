@@ -35,5 +35,9 @@
     { "name": "Demo detail countdown", "path": "/item/900004?demo=1", "expectText": "days left" },
     { "name": "Demo detail manual link", "path": "/item/900004?demo=1", "expectText": "Open manual" },
     { "name": "Add form manual field", "path": "/add", "expectSelector": "#f-manual-url" }
-  ]
+  ],
+  "icon": {
+    "image": "brand/icon.png",
+    "emoji": "🧾"
+  }
 }
