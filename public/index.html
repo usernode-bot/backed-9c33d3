@@ -172,6 +172,10 @@
           <button type="button" id="filter-all" class="chip bg-accent text-on-accent" aria-pressed="true">All</button>
           <button type="button" id="filter-expiring" class="chip bg-raised text-muted" aria-pressed="false">Expiring soon</button>
         </div>
+        <div class="flex flex-wrap gap-2" role="group" aria-label="Sort items">
+          <button type="button" id="sort-recent" class="chip bg-accent text-on-accent" aria-pressed="true">Recent</button>
+          <button type="button" id="sort-store" class="chip bg-raised text-muted" aria-pressed="false">By store</button>
+        </div>
       </section>
 
       <section>
@@ -461,7 +465,7 @@
       window.addEventListener('popstate', route);
 
       // ── Home ──────────────────────────────────────────────────────────
-      var homeQuery = { q: '', filter: 'all' };
+      var homeQuery = { q: '', filter: 'all', sort: 'recent' };
       var homeViews = {
         loading: $('home-loading'),
         list: $('home-list'),
@@ -508,6 +512,41 @@
       }
 
       function renderHome(items) {
+        // Group by store for the "By store" sort: keys are the trimmed
+        // lowercase store so names differing only in case or spacing merge;
+        // the header uses the first item's spelling. First-seen order keeps
+        // items newest-first inside each group; groups run A to Z and the
+        // "No store" group comes last.
+        function groupedRows(items) {
+          var groups = {};
+          var order = [];
+          items.forEach(function (item) {
+            var key = (item.store || '').trim().toLowerCase();
+            if (!groups[key]) {
+              groups[key] = { key: key, label: key ? item.store.trim() : 'No store', items: [] };
+              order.push(key);
+            }
+            groups[key].items.push(item);
+          });
+          var noStore = order.indexOf('');
+          if (noStore !== -1) order.splice(noStore, 1);
+          order.sort(function (a, b) {
+            return groups[a].label.localeCompare(groups[b].label, undefined, { sensitivity: 'base' });
+          });
+          if (noStore !== -1) order.push('');
+          var rows = [];
+          order.forEach(function (key) {
+            var h = document.createElement('h3');
+            h.className = 'bg-raised px-4 py-2 text-small font-medium text-muted';
+            h.textContent = groups[key].label;
+            var header = document.createElement('li');
+            header.appendChild(h);
+            rows.push(header);
+            groups[key].items.forEach(function (item) { rows.push(itemRow(item)); });
+          });
+          return rows;
+        }
+
         var reminders = items.filter(function (i) { return i.reminder; });
         var remSection = $('reminders');
         var remList = $('reminders-list');
@@ -534,7 +573,8 @@
 
         showHome(items.length ? 'list' : 'empty');
         if (items.length) {
-          homeViews.list.replaceChildren.apply(homeViews.list, items.map(itemRow));
+          var rows = homeQuery.sort === 'store' ? groupedRows(items) : items.map(itemRow);
+          homeViews.list.replaceChildren.apply(homeViews.list, rows);
         }
       }
 
@@ -576,6 +616,16 @@
       }
       $('filter-all').addEventListener('click', function () { setFilter('all'); });
       $('filter-expiring').addEventListener('click', function () { setFilter('expiring'); });
+      function setSort(which) {
+        homeQuery.sort = which;
+        $('sort-recent').className = which === 'recent' ? FILTER_ON : FILTER_OFF;
+        $('sort-recent').setAttribute('aria-pressed', which === 'recent' ? 'true' : 'false');
+        $('sort-store').className = which === 'store' ? FILTER_ON : FILTER_OFF;
+        $('sort-store').setAttribute('aria-pressed', which === 'store' ? 'true' : 'false');
+        loadHome();
+      }
+      $('sort-recent').addEventListener('click', function () { setSort('recent'); });
+      $('sort-store').addEventListener('click', function () { setSort('store'); });
       var SCALES = { normal: '100%', large: '125%', larger: '150%' };
       function setScale(which, save) {
         document.documentElement.style.fontSize = SCALES[which];
