@@ -134,7 +134,7 @@
        (bg-ground, text-muted, bg-accent, ...) that are right in both looks,
        and the kit components. Three screens, one client-side router below:
        / (the item list), /add (capture + confirm), /item/<id> (detail). -->
-  <main class="mx-auto flex max-w-md flex-col gap-6 px-4 pb-32 pt-4">
+  <main class="relative mx-auto flex max-w-md flex-col gap-6 px-4 pb-32 pt-4">
 
     <!-- Settings: above every screen, so zoom and text size are always
          reachable without taking space on Home. -->
@@ -146,7 +146,7 @@
 
     <!-- ── Home: reminders, search, filter, the item list ─────────────── -->
     <section id="view-home" class="flex flex-col gap-6">
-      <div>
+      <div class="pr-14">
         <h1 class="text-title">Backed</h1>
         <p class="text-small text-muted">Receipts, warranties and return deadlines.</p>
       </div>
