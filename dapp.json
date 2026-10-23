@@ -8,6 +8,14 @@
   "tests": [
     { "name": "Home empty state", "path": "/", "expectText": "No items yet" },
     {
+      "id": "home.welcome",
+      "name": "First-run welcome explains the 3 steps",
+      "path": "/",
+      "expectSelector": "#home-welcome:not([hidden]) #welcome-add",
+      "visual": true,
+      "impact": ["public/index.html", "styles/**"]
+    },
+    {
       "id": "items.sort-chips",
       "name": "Sort chips render",
       "path": "/?demo=1",
