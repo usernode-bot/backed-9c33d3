@@ -91,8 +91,9 @@
        The bridge is also where the app learns the viewer's light/dark theme:
        the script below reads it. -->
   <script src="/usernode-bridge/v1/bridge.js"></script>
-  <!-- Text size (Home → Text size): applied before first paint so the page
-       does not flash at 100%. Everything is sized in rem, so it all scales. -->
+  <!-- Text size (Settings → Text size): applied before first paint so the
+       page does not flash at 100%. Everything is sized in rem, so it all
+       scales. -->
   <script>
     (function () {
       var pct = { normal: '100%', large: '125%', larger: '150%' };
@@ -101,9 +102,9 @@
       document.documentElement.style.fontSize = pct[v] || '100%';
     })();
   </script>
-  <!-- Page zoom (the Zoom menu at the top of every screen): applied before
-       first paint so the page does not flash at 100%. CSS zoom scales the
-       whole page, layout included, on top of Text size. -->
+  <!-- Page zoom (Settings → Zoom): applied before first paint so the page
+       does not flash at 100%. CSS zoom scales the whole page, layout
+       included, on top of Text size. -->
   <script>
     (function () {
       var v = '100';
@@ -135,22 +136,12 @@
        / (the item list), /add (capture + confirm), /item/<id> (detail). -->
   <main class="mx-auto flex max-w-md flex-col gap-6 px-4 pb-32 pt-4">
 
-    <!-- Zoom: above every screen, so it is always reachable. -->
+    <!-- Settings: above every screen, so zoom and text size are always
+         reachable without taking space on Home. -->
     <div class="flex justify-end">
-      <label class="flex items-center gap-2">
-        <span class="text-small font-medium text-muted">Zoom</span>
-        <select id="zoom-select" class="field w-auto" aria-label="Page zoom">
-          <option value="50">50%</option>
-          <option value="75">75%</option>
-          <option value="90">90%</option>
-          <option value="100" selected>100%</option>
-          <option value="110">110%</option>
-          <option value="125">125%</option>
-          <option value="150">150%</option>
-          <option value="175">175%</option>
-          <option value="200">200%</option>
-        </select>
-      </label>
+      <button type="button" id="settings-open" class="btn-secondary px-0" aria-label="Settings" aria-haspopup="dialog">
+        <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.84 1.8A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.8l.3 1.5a7 7 0 0 1 1.5.87l1.45-.49a1 1 0 0 1 1.18.45l1.18 2.04a1 1 0 0 1-.2 1.25l-1.15 1.01a7 7 0 0 1 0 1.74l1.15 1.01a1 1 0 0 1 .2 1.25l-1.18 2.04a1 1 0 0 1-1.18.45l-1.45-.49a7 7 0 0 1-1.5.87l-.3 1.5a1 1 0 0 1-.98.8H8.82a1 1 0 0 1-.98-.8l-.3-1.5a7 7 0 0 1-1.5-.87l-1.45.49a1 1 0 0 1-1.18-.45L2.23 13.4a1 1 0 0 1 .2-1.25l1.15-1.01a7 7 0 0 1 0-1.74L2.43 8.39a1 1 0 0 1-.2-1.25L3.41 5.1a1 1 0 0 1 1.18-.45l1.45.49a7 7 0 0 1 1.5-.87l.3-1.5ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd"/></svg>
+      </button>
     </div>
 
     <!-- ── Home: reminders, search, filter, the item list ─────────────── -->
@@ -188,22 +179,10 @@
       <section class="flex flex-col gap-3">
         <input id="search" class="field" type="search" placeholder="Search items or stores"
                aria-label="Search items or stores" autocomplete="off">
-        <div class="flex flex-wrap gap-2" role="group" aria-label="Filter items">
+        <div class="flex flex-wrap gap-2" role="group" aria-label="Show items">
           <button type="button" id="filter-all" class="chip bg-accent text-on-accent" aria-pressed="true">All</button>
           <button type="button" id="filter-expiring" class="chip bg-raised text-muted" aria-pressed="false">Expiring soon</button>
-        </div>
-        <div class="flex flex-wrap gap-2" role="group" aria-label="Sort items">
-          <button type="button" id="sort-recent" class="chip bg-accent text-on-accent" aria-pressed="true">Recent</button>
-          <button type="button" id="sort-store" class="chip bg-raised text-muted" aria-pressed="false">By store</button>
-        </div>
-      </section>
-
-      <section>
-        <h2 class="section-label">Text size</h2>
-        <div class="flex flex-wrap gap-2" role="group" aria-label="Text size">
-          <button type="button" id="scale-normal" class="chip bg-accent text-on-accent" aria-pressed="true">Normal</button>
-          <button type="button" id="scale-large" class="chip bg-raised text-muted" aria-pressed="false">Large</button>
-          <button type="button" id="scale-larger" class="chip bg-raised text-muted" aria-pressed="false">Larger</button>
+          <button type="button" id="filter-store" class="chip bg-raised text-muted" aria-pressed="false">By store</button>
         </div>
       </section>
 
@@ -414,13 +393,45 @@
     <button type="button" id="photo-close" class="btn-secondary">Close</button>
   </div>
 
-  <!-- The one primary action, reachable one-handed from every list state. -->
-  <div id="add-bar" class="fixed inset-x-0 bottom-0 border-t border-line bg-ground/95 px-4 pt-3"
+  <!-- Settings: the same full-screen panel pattern as the receipt photo. -->
+  <div id="settings-dialog" class="fixed inset-0 z-50 flex flex-col gap-6 overflow-auto bg-ground p-4" role="dialog" aria-modal="true" aria-labelledby="settings-title" hidden>
+    <div class="mx-auto w-full max-w-md flex flex-col gap-6">
+      <h2 id="settings-title" class="text-heading">Settings</h2>
+
+      <section>
+        <h3 class="section-label">Zoom</h3>
+        <select id="zoom-select" class="field" aria-label="Page zoom">
+          <option value="50">50%</option>
+          <option value="75">75%</option>
+          <option value="90">90%</option>
+          <option value="100" selected>100%</option>
+          <option value="110">110%</option>
+          <option value="125">125%</option>
+          <option value="150">150%</option>
+          <option value="175">175%</option>
+          <option value="200">200%</option>
+        </select>
+      </section>
+
+      <section>
+        <h3 class="section-label">Text size</h3>
+        <div class="flex flex-wrap gap-2" role="group" aria-label="Text size">
+          <button type="button" id="scale-normal" class="chip bg-accent text-on-accent" aria-pressed="true">Normal</button>
+          <button type="button" id="scale-large" class="chip bg-raised text-muted" aria-pressed="false">Large</button>
+          <button type="button" id="scale-larger" class="chip bg-raised text-muted" aria-pressed="false">Larger</button>
+        </div>
+      </section>
+
+      <button type="button" id="settings-close" class="btn-secondary">Close</button>
+    </div>
+  </div>
+
+  <!-- The one primary action: a round button floating at the column's edge. -->
+  <div id="add-bar" class="pointer-events-none fixed inset-x-0 bottom-0 z-40"
        style="padding-bottom: calc(1.25rem + env(safe-area-inset-bottom));" hidden>
-    <div class="mx-auto max-w-md">
-      <button type="button" id="home-add" class="btn-primary h-14 w-full">
-        <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M1.5 6.375c0-1.036.84-1.875 1.875-1.875h2.27l1.341-1.688A1.875 1.875 0 0 1 8.506 2h2.988a1.875 1.875 0 0 1 1.52.762l1.341 1.688h2.27c1.035 0 1.875.84 1.875 1.875v9.25c0 1.035-.84 1.875-1.875 1.875H3.375A1.875 1.875 0 0 1 1.5 15.625v-9.25Zm4.5 4.625a4 4 0 1 1 8 0 4 4 0 0 1-8 0Z" clip-rule="evenodd"/></svg>
-        Add receipt
+    <div class="mx-auto flex max-w-md justify-end px-4">
+      <button type="button" id="home-add" class="btn-primary pointer-events-auto h-14 w-14 rounded-full px-0 shadow-lg" aria-label="Add receipt">
+        <svg class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M1.5 6.375c0-1.036.84-1.875 1.875-1.875h2.27l1.341-1.688A1.875 1.875 0 0 1 8.506 2h2.988a1.875 1.875 0 0 1 1.52.762l1.341 1.688h2.27c1.035 0 1.875.84 1.875 1.875v9.25c0 1.035-.84 1.875-1.875 1.875H3.375A1.875 1.875 0 0 1 1.5 15.625v-9.25Zm4.5 4.625a4 4 0 1 1 8 0 4 4 0 0 1-8 0Z" clip-rule="evenodd"/></svg>
       </button>
     </div>
   </div>
@@ -698,38 +709,44 @@
       var FILTER_OFF = 'chip bg-raised text-muted';
       var CARD_ON = 'card flex flex-col items-start gap-1 text-left border-accent bg-accent/10 ring-1 ring-accent';
       var CARD_OFF = 'card flex flex-col items-start gap-1 text-left hover:bg-raised';
-      function setFilter(which) {
-        homeQuery.filter = which;
-        $('filter-all').className = which === 'all' ? FILTER_ON : FILTER_OFF;
-        $('filter-all').setAttribute('aria-pressed', which === 'all' ? 'true' : 'false');
-        $('filter-expiring').className = which === 'expiring' ? FILTER_ON : FILTER_OFF;
-        $('filter-expiring').setAttribute('aria-pressed', which === 'expiring' ? 'true' : 'false');
+      // One row of chips: each sets the filter and the order together.
+      // The summary cards also set the filter (to a status group).
+      var CHIPS = { all: { filter: 'all', sort: 'recent' }, expiring: { filter: 'expiring', sort: 'recent' }, store: { filter: 'all', sort: 'store' } };
+      function chipOn(k) {
+        if (k === 'store') return homeQuery.sort === 'store' && homeQuery.filter === 'all';
+        return homeQuery.sort !== 'store' && homeQuery.filter === CHIPS[k].filter;
+      }
+      function applyHome(sortChanged) {
+        ['all', 'expiring', 'store'].forEach(function (k) {
+          var el = $('filter-' + k);
+          el.className = chipOn(k) ? FILTER_ON : FILTER_OFF;
+          el.setAttribute('aria-pressed', chipOn(k) ? 'true' : 'false');
+        });
         Object.keys(STATUS_GROUPS).forEach(function (key) {
-          $('summary-' + key).className = which === key ? CARD_ON : CARD_OFF;
-          $('summary-' + key).setAttribute('aria-pressed', which === key ? 'true' : 'false');
+          $('summary-' + key).className = homeQuery.filter === key ? CARD_ON : CARD_OFF;
+          $('summary-' + key).setAttribute('aria-pressed', homeQuery.filter === key ? 'true' : 'false');
         });
         // The filter is applied client-side, so a loaded list re-renders
-        // without another request.
-        if (lastItems) renderHome(lastItems);
+        // without another request; a new order needs a fresh load.
+        if (lastItems && !sortChanged) renderHome(lastItems);
         else loadHome();
       }
-      $('filter-all').addEventListener('click', function () { setFilter('all'); });
-      $('filter-expiring').addEventListener('click', function () { setFilter('expiring'); });
+      function setChip(which) {
+        var choice = CHIPS[which] || CHIPS.all;
+        var sortChanged = homeQuery.sort !== choice.sort;
+        homeQuery.filter = choice.filter;
+        homeQuery.sort = choice.sort;
+        applyHome(sortChanged);
+      }
+      $('filter-all').addEventListener('click', function () { setChip('all'); });
+      $('filter-expiring').addEventListener('click', function () { setChip('expiring'); });
+      $('filter-store').addEventListener('click', function () { setChip('store'); });
       Object.keys(STATUS_GROUPS).forEach(function (key) {
         $('summary-' + key).addEventListener('click', function () {
-          setFilter(homeQuery.filter === key ? 'all' : key);
+          homeQuery.filter = homeQuery.filter === key ? 'all' : key;
+          applyHome(false);
         });
       });
-      function setSort(which) {
-        homeQuery.sort = which;
-        $('sort-recent').className = which === 'recent' ? FILTER_ON : FILTER_OFF;
-        $('sort-recent').setAttribute('aria-pressed', which === 'recent' ? 'true' : 'false');
-        $('sort-store').className = which === 'store' ? FILTER_ON : FILTER_OFF;
-        $('sort-store').setAttribute('aria-pressed', which === 'store' ? 'true' : 'false');
-        loadHome();
-      }
-      $('sort-recent').addEventListener('click', function () { setSort('recent'); });
-      $('sort-store').addEventListener('click', function () { setSort('store'); });
       var SCALES = { normal: '100%', large: '125%', larger: '150%' };
       function setScale(which, save) {
         document.documentElement.style.fontSize = SCALES[which];
@@ -757,13 +774,26 @@
       });
 
       function closePhoto() { $('photo-viewer').hidden = true; }
+      function openSettings() {
+        $('settings-dialog').hidden = false;
+        $('settings-close').focus();
+      }
+      function closeSettings() {
+        if ($('settings-dialog').hidden) return;
+        $('settings-dialog').hidden = true;
+        $('settings-open').focus();
+      }
+      $('settings-open').addEventListener('click', openSettings);
+      $('settings-close').addEventListener('click', closeSettings);
       $('item-receipt-open').addEventListener('click', function () {
         $('photo-viewer-img').src = $('item-receipt').src;
         $('photo-viewer').hidden = false;
         $('photo-close').focus();
       });
       $('photo-close').addEventListener('click', closePhoto);
-      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closePhoto(); });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { closePhoto(); closeSettings(); }
+      });
       $('home-retry').addEventListener('click', loadHome);
       $('home-add').addEventListener('click', function () { nav('/add'); });
       $('welcome-add').addEventListener('click', function () { nav('/add'); });
