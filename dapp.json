@@ -13,8 +13,10 @@
       "path": "/?demo=1",
       "expectSelector": "#sort-store"
     },
-    { "name": "Zoom menu on Home", "path": "/", "expectSelector": "#zoom-select option[value='200']" },
-    { "name": "Zoom menu on Add", "path": "/add", "expectSelector": "#zoom-select" },
+    { "name": "Show row: All, Expiring soon, By store", "path": "/?demo=1", "expectSelector": "#filter-all + #filter-expiring + #sort-store" },
+    { "name": "Zoom and Text size in Settings on Home", "path": "/", "expectSelector": "#settings-panel #zoom-select option[value='200']" },
+    { "name": "Settings gear on Add", "path": "/add", "expectSelector": "#settings-btn[aria-controls='settings-panel']" },
+    { "name": "Add receipt floats bottom right", "path": "/?demo=1", "expectSelector": "#add-bar.fixed > div.justify-end > #home-add.rounded-full" },
     {
       "id": "items.demo-list",
       "name": "Item list with statuses",
