@@ -9,12 +9,13 @@
     { "name": "Home empty state", "path": "/", "expectText": "No items yet" },
     {
       "id": "items.sort-chips",
-      "name": "Sort chips render",
+      "name": "Filter chips render",
       "path": "/?demo=1",
-      "expectSelector": "#sort-store"
+      "expectSelector": "#filter-store"
     },
-    { "name": "Zoom menu on Home", "path": "/", "expectSelector": "#zoom-select option[value='200']" },
-    { "name": "Zoom menu on Add", "path": "/add", "expectSelector": "#zoom-select" },
+    { "name": "Settings button on Home", "path": "/", "expectSelector": "#settings-open[aria-label='Settings']" },
+    { "name": "Zoom menu in Settings", "path": "/", "expectSelector": "#settings-dialog #zoom-select option[value='200']" },
+    { "name": "Settings button on Add", "path": "/add", "expectSelector": "#settings-open" },
     {
       "id": "items.demo-list",
       "name": "Item list with statuses",
