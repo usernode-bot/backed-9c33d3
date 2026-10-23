@@ -160,6 +160,26 @@
         <p class="text-small text-muted">Receipts, warranties and return deadlines.</p>
       </div>
 
+      <!-- Status summary: one card per status group, counted over the items
+           the search matches. Tapping a card filters the list to it; tapping
+           the selected card again clears the filter. -->
+      <section id="summary" hidden>
+        <div class="grid grid-cols-3 gap-2" role="group" aria-label="Ringkasan status">
+          <button type="button" id="summary-active" class="card flex flex-col items-start gap-1 text-left hover:bg-raised" aria-pressed="false">
+            <span id="summary-active-count" class="text-title">0</span>
+            <span class="flex items-center gap-1.5 text-small text-muted"><span class="h-2 w-2 shrink-0 rounded-full bg-accent" aria-hidden="true"></span>Aktif</span>
+          </button>
+          <button type="button" id="summary-expiring" class="card flex flex-col items-start gap-1 text-left hover:bg-raised" aria-pressed="false">
+            <span id="summary-expiring-count" class="text-title">0</span>
+            <span class="flex items-center gap-1.5 text-small text-muted"><span class="h-2 w-2 shrink-0 rounded-full bg-warn" aria-hidden="true"></span>Segera habis</span>
+          </button>
+          <button type="button" id="summary-expired" class="card flex flex-col items-start gap-1 text-left hover:bg-raised" aria-pressed="false">
+            <span id="summary-expired-count" class="text-title">0</span>
+            <span class="flex items-center gap-1.5 text-small text-muted"><span class="h-2 w-2 shrink-0 rounded-full bg-muted" aria-hidden="true"></span>Sudah habis</span>
+          </button>
+        </div>
+      </section>
+
       <section id="reminders" hidden>
         <h2 class="section-label">Reminders</h2>
         <ul id="reminders-list" class="list"></ul>
@@ -201,6 +221,7 @@
           </div>
         </div>
         <ul id="home-list" class="list" hidden></ul>
+        <p id="home-filtered-empty" class="px-1 py-4 text-body text-muted" hidden>Tidak ada barang dengan status ini.</p>
         <div id="home-empty" class="state-empty" hidden>
           <svg class="h-8 w-8 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 4.5A2.25 2.25 0 0 1 8.25 2.25h7.5L19.5 6v13.5a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5v-15A1.5 1.5 0 0 1 6 4.5Z"/><path stroke-linecap="round" d="M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg>
           <p class="text-heading">No items yet</p>
@@ -511,6 +532,7 @@
         empty: $('home-empty'),
         welcome: $('home-welcome'),
         error: $('home-error'),
+        filteredEmpty: $('home-filtered-empty'),
       };
       function showHome(state) {
         for (var name in homeViews) homeViews[name].hidden = name !== state;
@@ -553,7 +575,32 @@
         return li;
       }
 
-      function renderHome(items) {
+      // Status groups behind the summary cards and the filter chips. The
+      // summary counts every item the search matches; the filter then picks
+      // one group client-side, so the counts never shrink to the selection.
+      var STATUS_GROUPS = {
+        active: ['covered'],
+        expiring: ['return-window', 'expiring-soon'],
+        expired: ['expired'],
+      };
+      var lastItems = null;
+
+      function renderSummary(items) {
+        Object.keys(STATUS_GROUPS).forEach(function (key) {
+          var n = items.filter(function (i) { return STATUS_GROUPS[key].indexOf(i.status) !== -1; }).length;
+          $('summary-' + key + '-count').textContent = String(n);
+        });
+        $('summary').hidden = !items.length && !homeQuery.q;
+      }
+
+      function renderHome(allItems) {
+        lastItems = allItems;
+        renderSummary(allItems);
+        var group = STATUS_GROUPS[homeQuery.filter];
+        var items = group
+          ? allItems.filter(function (i) { return group.indexOf(i.status) !== -1; })
+          : allItems;
+
         // Group by store for the "By store" sort: keys are the trimmed
         // lowercase store so names differing only in case or spacing merge;
         // the header uses the first item's spelling. First-seen order keeps
@@ -589,7 +636,7 @@
           return rows;
         }
 
-        var reminders = items.filter(function (i) { return i.reminder; });
+        var reminders = allItems.filter(function (i) { return i.reminder; });
         var remSection = $('reminders');
         var remList = $('reminders-list');
         if (reminders.length) {
@@ -614,7 +661,7 @@
         }
 
         var narrowed = homeQuery.q || homeQuery.filter !== 'all';
-        showHome(items.length ? 'list' : (narrowed ? 'empty' : 'welcome'));
+        showHome(items.length ? 'list' : (group && allItems.length ? 'filteredEmpty' : (narrowed ? 'empty' : 'welcome')));
         if (items.length) {
           var rows = homeQuery.sort === 'store' ? groupedRows(items) : items.map(itemRow);
           homeViews.list.replaceChildren.apply(homeViews.list, rows);
@@ -622,10 +669,10 @@
       }
 
       function loadHome() {
+        lastItems = null;
         showHome('loading');
         var qs = new URLSearchParams();
         if (homeQuery.q) qs.set('q', homeQuery.q);
-        if (homeQuery.filter === 'expiring') qs.set('filter', 'expiring');
         if (demoMode) qs.set('demo', '1');
         var suffix = qs.toString() ? '?' + qs.toString() : '';
         var items;
@@ -635,7 +682,7 @@
             return res.json();
           })
           .then(function (body) { items = body.items; renderHome(items); })
-          .catch(function () { showHome('error'); });
+          .catch(function () { $('summary').hidden = true; showHome('error'); });
       }
 
       var searchTimer = null;
@@ -649,16 +696,30 @@
 
       var FILTER_ON = 'chip bg-accent text-on-accent';
       var FILTER_OFF = 'chip bg-raised text-muted';
+      var CARD_ON = 'card flex flex-col items-start gap-1 text-left border-accent bg-accent/10 ring-1 ring-accent';
+      var CARD_OFF = 'card flex flex-col items-start gap-1 text-left hover:bg-raised';
       function setFilter(which) {
         homeQuery.filter = which;
         $('filter-all').className = which === 'all' ? FILTER_ON : FILTER_OFF;
         $('filter-all').setAttribute('aria-pressed', which === 'all' ? 'true' : 'false');
         $('filter-expiring').className = which === 'expiring' ? FILTER_ON : FILTER_OFF;
         $('filter-expiring').setAttribute('aria-pressed', which === 'expiring' ? 'true' : 'false');
-        loadHome();
+        Object.keys(STATUS_GROUPS).forEach(function (key) {
+          $('summary-' + key).className = which === key ? CARD_ON : CARD_OFF;
+          $('summary-' + key).setAttribute('aria-pressed', which === key ? 'true' : 'false');
+        });
+        // The filter is applied client-side, so a loaded list re-renders
+        // without another request.
+        if (lastItems) renderHome(lastItems);
+        else loadHome();
       }
       $('filter-all').addEventListener('click', function () { setFilter('all'); });
       $('filter-expiring').addEventListener('click', function () { setFilter('expiring'); });
+      Object.keys(STATUS_GROUPS).forEach(function (key) {
+        $('summary-' + key).addEventListener('click', function () {
+          setFilter(homeQuery.filter === key ? 'all' : key);
+        });
+      });
       function setSort(which) {
         homeQuery.sort = which;
         $('sort-recent').className = which === 'recent' ? FILTER_ON : FILTER_OFF;
