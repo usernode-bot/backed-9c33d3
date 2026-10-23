@@ -151,6 +151,26 @@
         <p class="text-small text-muted">Receipts, warranties and return deadlines.</p>
       </div>
 
+      <!-- Status summary: one card per status group, counted over the items
+           the search matches. Tapping a card filters the list to it; tapping
+           the selected card again clears the filter. -->
+      <section id="summary" hidden>
+        <div class="grid grid-cols-3 gap-2" role="group" aria-label="Ringkasan status">
+          <button type="button" id="summary-active" class="card flex flex-col items-start gap-1 text-left hover:bg-raised" aria-pressed="false">
+            <span id="summary-active-count" class="text-title">0</span>
+            <span class="flex items-center gap-1.5 text-small text-muted"><span class="h-2 w-2 shrink-0 rounded-full bg-accent" aria-hidden="true"></span>Aktif</span>
+          </button>
+          <button type="button" id="summary-expiring" class="card flex flex-col items-start gap-1 text-left hover:bg-raised" aria-pressed="false">
+            <span id="summary-expiring-count" class="text-title">0</span>
+            <span class="flex items-center gap-1.5 text-small text-muted"><span class="h-2 w-2 shrink-0 rounded-full bg-warn" aria-hidden="true"></span>Segera habis</span>
+          </button>
+          <button type="button" id="summary-expired" class="card flex flex-col items-start gap-1 text-left hover:bg-raised" aria-pressed="false">
+            <span id="summary-expired-count" class="text-title">0</span>
+            <span class="flex items-center gap-1.5 text-small text-muted"><span class="h-2 w-2 shrink-0 rounded-full bg-muted" aria-hidden="true"></span>Sudah habis</span>
+          </button>
+        </div>
+      </section>
+
       <section id="reminders" hidden>
         <h2 class="section-label">Reminders</h2>
         <ul id="reminders-list" class="list"></ul>
@@ -180,10 +200,50 @@
           </div>
         </div>
         <ul id="home-list" class="list" hidden></ul>
+        <p id="home-filtered-empty" class="px-1 py-4 text-body text-muted" hidden>Tidak ada barang dengan status ini.</p>
         <div id="home-empty" class="state-empty" hidden>
           <svg class="h-8 w-8 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 4.5A2.25 2.25 0 0 1 8.25 2.25h7.5L19.5 6v13.5a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5v-15A1.5 1.5 0 0 1 6 4.5Z"/><path stroke-linecap="round" d="M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg>
           <p class="text-heading">No items yet</p>
           <p class="text-body text-muted">Add your first receipt to start tracking warranties.</p>
+        </div>
+        <!-- First run: no items at all (no search or filter active). Explains
+             what Backed does in three steps and ends with the add action,
+             which stands in for the bottom add bar while this shows. -->
+        <div id="home-welcome" class="flex flex-col gap-6 py-2" hidden>
+          <div class="flex flex-col gap-1">
+            <p class="text-heading">No items yet</p>
+            <p class="text-body text-muted">Backed keeps your receipts and warns you before a warranty runs out.</p>
+          </div>
+          <ol class="flex flex-col gap-4" aria-label="How Backed works">
+            <li class="flex items-start gap-4">
+              <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+              </span>
+              <div class="min-w-0 flex-1">
+                <p class="text-body font-medium">1. Photograph your receipt</p>
+                <p class="text-small text-muted">Backed reads the store, item, date and price for you.</p>
+              </div>
+            </li>
+            <li class="flex items-start gap-4">
+              <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+              </span>
+              <div class="min-w-0 flex-1">
+                <p class="text-body font-medium">2. The warranty is recorded for you</p>
+                <p class="text-small text-muted">Backed suggests the warranty length and tracks the return deadline.</p>
+              </div>
+            </li>
+            <li class="flex items-start gap-4">
+              <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.27 21a2 2 0 0 0 3.46 0"/><path d="M3.26 15.33A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.67C19.41 13.96 18 12.5 18 8A6 6 0 0 0 6 8c0 4.5-1.41 5.96-2.74 7.33"/></svg>
+              </span>
+              <div class="min-w-0 flex-1">
+                <p class="text-body font-medium">3. Get reminded before it ends</p>
+                <p class="text-small text-muted">A reminder shows on Home 30, 7 and 1 day before the warranty runs out.</p>
+              </div>
+            </li>
+          </ol>
+          <button type="button" id="welcome-add" class="btn-primary h-14 w-full">Add your first receipt</button>
         </div>
         <div id="home-error" class="state-error" hidden>
           <svg class="h-6 w-6 text-danger" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
@@ -481,10 +541,14 @@
         loading: $('home-loading'),
         list: $('home-list'),
         empty: $('home-empty'),
+        welcome: $('home-welcome'),
         error: $('home-error'),
+        filteredEmpty: $('home-filtered-empty'),
       };
       function showHome(state) {
         for (var name in homeViews) homeViews[name].hidden = name !== state;
+        // The welcome screen ends with its own add button.
+        addBar.hidden = state === 'welcome';
       }
 
       function itemRow(item) {
@@ -522,7 +586,32 @@
         return li;
       }
 
-      function renderHome(items) {
+      // Status groups behind the summary cards and the filter chips. The
+      // summary counts every item the search matches; the filter then picks
+      // one group client-side, so the counts never shrink to the selection.
+      var STATUS_GROUPS = {
+        active: ['covered'],
+        expiring: ['return-window', 'expiring-soon'],
+        expired: ['expired'],
+      };
+      var lastItems = null;
+
+      function renderSummary(items) {
+        Object.keys(STATUS_GROUPS).forEach(function (key) {
+          var n = items.filter(function (i) { return STATUS_GROUPS[key].indexOf(i.status) !== -1; }).length;
+          $('summary-' + key + '-count').textContent = String(n);
+        });
+        $('summary').hidden = !items.length && !homeQuery.q;
+      }
+
+      function renderHome(allItems) {
+        lastItems = allItems;
+        renderSummary(allItems);
+        var group = STATUS_GROUPS[homeQuery.filter];
+        var items = group
+          ? allItems.filter(function (i) { return group.indexOf(i.status) !== -1; })
+          : allItems;
+
         // Group by store for the "By store" sort: keys are the trimmed
         // lowercase store so names differing only in case or spacing merge;
         // the header uses the first item's spelling. First-seen order keeps
@@ -558,7 +647,7 @@
           return rows;
         }
 
-        var reminders = items.filter(function (i) { return i.reminder; });
+        var reminders = allItems.filter(function (i) { return i.reminder; });
         var remSection = $('reminders');
         var remList = $('reminders-list');
         if (reminders.length) {
@@ -582,7 +671,8 @@
           remSection.hidden = true;
         }
 
-        showHome(items.length ? 'list' : 'empty');
+        var narrowed = homeQuery.q || homeQuery.filter !== 'all';
+        showHome(items.length ? 'list' : (group && allItems.length ? 'filteredEmpty' : (narrowed ? 'empty' : 'welcome')));
         if (items.length) {
           var rows = homeQuery.sort === 'store' ? groupedRows(items) : items.map(itemRow);
           homeViews.list.replaceChildren.apply(homeViews.list, rows);
@@ -590,10 +680,10 @@
       }
 
       function loadHome() {
+        lastItems = null;
         showHome('loading');
         var qs = new URLSearchParams();
         if (homeQuery.q) qs.set('q', homeQuery.q);
-        if (homeQuery.filter === 'expiring') qs.set('filter', 'expiring');
         if (demoMode) qs.set('demo', '1');
         var suffix = qs.toString() ? '?' + qs.toString() : '';
         var items;
@@ -603,7 +693,7 @@
             return res.json();
           })
           .then(function (body) { items = body.items; renderHome(items); })
-          .catch(function () { showHome('error'); });
+          .catch(function () { $('summary').hidden = true; showHome('error'); });
       }
 
       var searchTimer = null;
@@ -617,22 +707,46 @@
 
       var FILTER_ON = 'chip bg-accent text-on-accent';
       var FILTER_OFF = 'chip bg-raised text-muted';
+      var CARD_ON = 'card flex flex-col items-start gap-1 text-left border-accent bg-accent/10 ring-1 ring-accent';
+      var CARD_OFF = 'card flex flex-col items-start gap-1 text-left hover:bg-raised';
       // One row of chips: each sets the filter and the order together.
+      // The summary cards also set the filter (to a status group).
       var CHIPS = { all: { filter: 'all', sort: 'recent' }, expiring: { filter: 'expiring', sort: 'recent' }, store: { filter: 'all', sort: 'store' } };
-      function setChip(which) {
-        var choice = CHIPS[which] || CHIPS.all;
-        homeQuery.filter = choice.filter;
-        homeQuery.sort = choice.sort;
+      function chipOn(k) {
+        if (k === 'store') return homeQuery.sort === 'store' && homeQuery.filter === 'all';
+        return homeQuery.sort !== 'store' && homeQuery.filter === CHIPS[k].filter;
+      }
+      function applyHome(sortChanged) {
         ['all', 'expiring', 'store'].forEach(function (k) {
           var el = $('filter-' + k);
-          el.className = k === which ? FILTER_ON : FILTER_OFF;
-          el.setAttribute('aria-pressed', k === which ? 'true' : 'false');
+          el.className = chipOn(k) ? FILTER_ON : FILTER_OFF;
+          el.setAttribute('aria-pressed', chipOn(k) ? 'true' : 'false');
         });
-        loadHome();
+        Object.keys(STATUS_GROUPS).forEach(function (key) {
+          $('summary-' + key).className = homeQuery.filter === key ? CARD_ON : CARD_OFF;
+          $('summary-' + key).setAttribute('aria-pressed', homeQuery.filter === key ? 'true' : 'false');
+        });
+        // The filter is applied client-side, so a loaded list re-renders
+        // without another request; a new order needs a fresh load.
+        if (lastItems && !sortChanged) renderHome(lastItems);
+        else loadHome();
+      }
+      function setChip(which) {
+        var choice = CHIPS[which] || CHIPS.all;
+        var sortChanged = homeQuery.sort !== choice.sort;
+        homeQuery.filter = choice.filter;
+        homeQuery.sort = choice.sort;
+        applyHome(sortChanged);
       }
       $('filter-all').addEventListener('click', function () { setChip('all'); });
       $('filter-expiring').addEventListener('click', function () { setChip('expiring'); });
       $('filter-store').addEventListener('click', function () { setChip('store'); });
+      Object.keys(STATUS_GROUPS).forEach(function (key) {
+        $('summary-' + key).addEventListener('click', function () {
+          homeQuery.filter = homeQuery.filter === key ? 'all' : key;
+          applyHome(false);
+        });
+      });
       var SCALES = { normal: '100%', large: '125%', larger: '150%' };
       function setScale(which, save) {
         document.documentElement.style.fontSize = SCALES[which];
@@ -682,6 +796,7 @@
       });
       $('home-retry').addEventListener('click', loadHome);
       $('home-add').addEventListener('click', function () { nav('/add'); });
+      $('welcome-add').addEventListener('click', function () { nav('/add'); });
 
       // ── Add: capture, OCR prefill, confirm ────────────────────────────
       var WARRANTY_SUGGESTION = { electronics: 12, appliances: 24, furniture: 12, clothing: 0, other: 12 };
