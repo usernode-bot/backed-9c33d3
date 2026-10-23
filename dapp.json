@@ -8,6 +8,14 @@
   "tests": [
     { "name": "Home empty state", "path": "/", "expectText": "No items yet" },
     {
+      "id": "home.welcome",
+      "name": "First-run welcome explains the 3 steps",
+      "path": "/",
+      "expectSelector": "#home-welcome:not([hidden]) #welcome-add",
+      "visual": true,
+      "impact": ["public/index.html", "styles/**"]
+    },
+    {
       "id": "items.sort-chips",
       "name": "Sort chips render",
       "path": "/?demo=1",
@@ -46,7 +54,16 @@
     { "name": "Demo reminders fire", "path": "/?demo=1", "expectText": "warranty ends in 7 days" },
     { "name": "Demo detail countdown", "path": "/item/900004?demo=1", "expectText": "days left" },
     { "name": "Demo detail manual link", "path": "/item/900004?demo=1", "expectText": "Open manual" },
-    { "name": "Add form manual field", "path": "/add", "expectSelector": "#f-manual-url" }
+    { "name": "Add form manual field", "path": "/add", "expectSelector": "#f-manual-url" },
+    {
+      "id": "items.status-summary",
+      "name": "Status summary cards",
+      "path": "/?demo=1",
+      "expectSelector": "#summary:not([hidden]) #summary-expiring",
+      "visual": true,
+      "impact": ["public/index.html"]
+    },
+    { "name": "Status summary label", "path": "/?demo=1", "expectText": "Segera habis" }
   ],
   "icon": {
     "image": "brand/icon.png",
