@@ -8,6 +8,14 @@
   "tests": [
     { "name": "Home empty state", "path": "/", "expectText": "No items yet" },
     {
+      "id": "home.welcome",
+      "name": "First-run welcome explains the 3 steps",
+      "path": "/",
+      "expectSelector": "#home-welcome:not([hidden]) #welcome-add",
+      "visual": true,
+      "impact": ["public/index.html", "styles/**"]
+    },
+    {
       "id": "items.sort-chips",
       "name": "Sort chips render",
       "path": "/?demo=1",
@@ -43,7 +51,16 @@
     { "name": "Add form manual field", "path": "/add", "expectSelector": "#f-manual-url" },
     { "name": "Item cards: yellow warranty bar", "path": "/?demo=1", "expectSelector": "[data-warranty-tone='soon'] [role='progressbar']" },
     { "name": "Item cards: months left in Indonesian", "path": "/?demo=1", "expectText": "Sisa 3 bulan" },
-    { "name": "Item cards: expired warranty", "path": "/?demo=1", "expectText": "Garansi habis" }
+    { "name": "Item cards: expired warranty", "path": "/?demo=1", "expectText": "Garansi habis" },
+    {
+      "id": "items.status-summary",
+      "name": "Status summary cards",
+      "path": "/?demo=1",
+      "expectSelector": "#summary:not([hidden]) #summary-expiring",
+      "visual": true,
+      "impact": ["public/index.html"]
+    },
+    { "name": "Status summary label", "path": "/?demo=1", "expectText": "Segera habis" }
   ],
   "icon": {
     "image": "brand/icon.png",
