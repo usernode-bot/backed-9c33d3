@@ -13,6 +13,15 @@
       "path": "/?demo=1",
       "expectSelector": "#sort-store"
     },
+    {
+      "id": "items.summary-cards",
+      "name": "Status summary cards render",
+      "path": "/?demo=1",
+      "expectSelector": "#summary [data-filter='expired']",
+      "expectText": "Expired",
+      "visual": true,
+      "impact": ["public/**", "server.js", "styles/**", "dapp.json"]
+    },
     { "name": "Zoom menu on Home", "path": "/", "expectSelector": "#zoom-select option[value='200']" },
     { "name": "Zoom menu on Add", "path": "/add", "expectSelector": "#zoom-select" },
     {

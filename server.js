@@ -209,6 +209,33 @@ function statusFor(item, today) {
   return 'covered';
 }
 
+// The list's three filter groups, as the statuses each one holds. They split
+// every status statusFor returns, so their counts add up to the whole list.
+const FILTER_STATUSES = {
+  active: ['covered'],
+  expiring: ['return-window', 'expiring-soon'],
+  expired: ['expired'],
+};
+
+function countStatuses(items) {
+  const counts = { active: 0, expiring: 0, expired: 0 };
+  items.forEach((item) => {
+    Object.keys(FILTER_STATUSES).forEach((key) => {
+      if (FILTER_STATUSES[key].includes(item.status)) counts[key] += 1;
+    });
+  });
+  return counts;
+}
+
+// Keep the items in one group. An unknown or missing filter keeps them all.
+function filterByStatus(items, filter) {
+  if (typeof filter !== 'string' ||
+      !Object.prototype.hasOwnProperty.call(FILTER_STATUSES, filter)) {
+    return items;
+  }
+  return items.filter((item) => FILTER_STATUSES[filter].includes(item.status));
+}
+
 // The fixed reminder schedule: warranty expiration minus 30, 7 and 1 days
 // (plus the day itself), return deadline minus 3 and 1 days (plus the day
 // itself). Exact day-counts only, so a reminder appears on the day it is
@@ -387,10 +414,11 @@ app.get('/api/items', async (req, res) => {
         demo = demo.filter((i) =>
           i.name.toLowerCase().includes(q) || (i.store || '').toLowerCase().includes(q));
       }
-      if (req.query.filter === 'expiring') {
-        demo = demo.filter((i) => i.status === 'return-window' || i.status === 'expiring-soon');
-      }
-      return res.json({ items: demo });
+      // Counts come from the search-matched set, before the status filter,
+      // so they do not change when a group is chosen.
+      const counts = countStatuses(demo);
+      demo = filterByStatus(demo, req.query.filter);
+      return res.json({ items: demo, counts });
     }
 
     const params = [req.user ? req.user.id : null];
@@ -405,10 +433,9 @@ app.get('/api/items', async (req, res) => {
       params
     );
     let items = rows.map((row) => presentItem(row, today));
-    if (req.query.filter === 'expiring') {
-      items = items.filter((i) => i.status === 'return-window' || i.status === 'expiring-soon');
-    }
-    res.json({ items });
+    const counts = countStatuses(items);
+    items = filterByStatus(items, req.query.filter);
+    res.json({ items, counts });
   } catch (err) {
     console.error('GET /api/items failed:', err.message);
     res.status(500).json({ error: 'Could not load items' });

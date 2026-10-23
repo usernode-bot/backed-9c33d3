@@ -166,12 +166,22 @@
       </section>
 
       <section class="flex flex-col gap-3">
+        <div id="summary" class="grid grid-cols-3 gap-2" role="group" aria-label="Filter items" hidden>
+          <button type="button" class="card text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ground" data-filter="active" aria-pressed="false">
+            <p class="text-title" data-count>0</p>
+            <p class="text-small text-muted">Active</p>
+          </button>
+          <button type="button" class="card text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ground" data-filter="expiring" aria-pressed="false">
+            <p class="text-title" data-count>0</p>
+            <p class="text-small text-muted">Expiring soon</p>
+          </button>
+          <button type="button" class="card text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ground" data-filter="expired" aria-pressed="false">
+            <p class="text-title" data-count>0</p>
+            <p class="text-small text-muted">Expired</p>
+          </button>
+        </div>
         <input id="search" class="field" type="search" placeholder="Search items or stores"
                aria-label="Search items or stores" autocomplete="off">
-        <div class="flex flex-wrap gap-2" role="group" aria-label="Filter items">
-          <button type="button" id="filter-all" class="chip bg-accent text-on-accent" aria-pressed="true">All</button>
-          <button type="button" id="filter-expiring" class="chip bg-raised text-muted" aria-pressed="false">Expiring soon</button>
-        </div>
         <div class="flex flex-wrap gap-2" role="group" aria-label="Sort items">
           <button type="button" id="sort-recent" class="chip bg-accent text-on-accent" aria-pressed="true">Recent</button>
           <button type="button" id="sort-store" class="chip bg-raised text-muted" aria-pressed="false">By store</button>
@@ -205,6 +215,11 @@
           <svg class="h-8 w-8 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 4.5A2.25 2.25 0 0 1 8.25 2.25h7.5L19.5 6v13.5a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5v-15A1.5 1.5 0 0 1 6 4.5Z"/><path stroke-linecap="round" d="M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg>
           <p class="text-heading">No items yet</p>
           <p class="text-body text-muted">Add your first receipt to start tracking warranties.</p>
+        </div>
+        <div id="home-empty-filter" class="state-empty" hidden>
+          <svg class="h-8 w-8 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 4.5A2.25 2.25 0 0 1 8.25 2.25h7.5L19.5 6v13.5a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5v-15A1.5 1.5 0 0 1 6 4.5Z"/><path stroke-linecap="round" d="M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg>
+          <p class="text-heading">No items in this group</p>
+          <p class="text-body text-muted">Tap the card again to see all your items.</p>
         </div>
         <div id="home-error" class="state-error" hidden>
           <svg class="h-6 w-6 text-danger" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
@@ -470,6 +485,7 @@
         loading: $('home-loading'),
         list: $('home-list'),
         empty: $('home-empty'),
+        emptyFilter: $('home-empty-filter'),
         error: $('home-error'),
       };
       function showHome(state) {
@@ -511,7 +527,11 @@
         return li;
       }
 
-      function renderHome(items) {
+      var CARD_OFF = 'card text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ground';
+      var CARD_ON = CARD_OFF + ' border-accent bg-accent/10';
+      var summaryCards = $('summary').querySelectorAll('[data-filter]');
+
+      function renderHome(items, counts) {
         // Group by store for the "By store" sort: keys are the trimmed
         // lowercase store so names differing only in case or spacing merge;
         // the header uses the first item's spelling. First-seen order keeps
@@ -571,7 +591,20 @@
           remSection.hidden = true;
         }
 
-        showHome(items.length ? 'list' : 'empty');
+        var total = 0;
+        Array.prototype.forEach.call(summaryCards, function (card) {
+          var key = card.getAttribute('data-filter');
+          var n = counts && counts[key] ? counts[key] : 0;
+          card.querySelector('[data-count]').textContent = String(n);
+          var on = homeQuery.filter === key;
+          card.className = on ? CARD_ON : CARD_OFF;
+          card.setAttribute('aria-pressed', on ? 'true' : 'false');
+          total += n;
+        });
+        $('summary').hidden = !(total > 0 || homeQuery.q);
+
+        showHome(items.length ? 'list'
+          : (homeQuery.filter !== 'all' ? 'emptyFilter' : 'empty'));
         if (items.length) {
           var rows = homeQuery.sort === 'store' ? groupedRows(items) : items.map(itemRow);
           homeViews.list.replaceChildren.apply(homeViews.list, rows);
@@ -580,9 +613,10 @@
 
       function loadHome() {
         showHome('loading');
+        $('summary').hidden = true;
         var qs = new URLSearchParams();
         if (homeQuery.q) qs.set('q', homeQuery.q);
-        if (homeQuery.filter === 'expiring') qs.set('filter', 'expiring');
+        if (homeQuery.filter !== 'all') qs.set('filter', homeQuery.filter);
         if (demoMode) qs.set('demo', '1');
         var suffix = qs.toString() ? '?' + qs.toString() : '';
         var items;
@@ -591,7 +625,7 @@
             if (!res.ok) throw new Error('HTTP ' + res.status);
             return res.json();
           })
-          .then(function (body) { items = body.items; renderHome(items); })
+          .then(function (body) { items = body.items; renderHome(items, body.counts); })
           .catch(function () { showHome('error'); });
       }
 
@@ -606,16 +640,13 @@
 
       var FILTER_ON = 'chip bg-accent text-on-accent';
       var FILTER_OFF = 'chip bg-raised text-muted';
-      function setFilter(which) {
-        homeQuery.filter = which;
-        $('filter-all').className = which === 'all' ? FILTER_ON : FILTER_OFF;
-        $('filter-all').setAttribute('aria-pressed', which === 'all' ? 'true' : 'false');
-        $('filter-expiring').className = which === 'expiring' ? FILTER_ON : FILTER_OFF;
-        $('filter-expiring').setAttribute('aria-pressed', which === 'expiring' ? 'true' : 'false');
-        loadHome();
-      }
-      $('filter-all').addEventListener('click', function () { setFilter('all'); });
-      $('filter-expiring').addEventListener('click', function () { setFilter('expiring'); });
+      Array.prototype.forEach.call(summaryCards, function (card) {
+        card.addEventListener('click', function () {
+          var f = card.getAttribute('data-filter');
+          homeQuery.filter = homeQuery.filter === f ? 'all' : f;
+          loadHome();
+        });
+      });
       function setSort(which) {
         homeQuery.sort = which;
         $('sort-recent').className = which === 'recent' ? FILTER_ON : FILTER_OFF;
