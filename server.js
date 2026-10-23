@@ -372,6 +372,23 @@ function demoItems(today) {
       manual_file_id: null,
       manual_file_url: null,
     },
+    {
+      id: 900006,
+      name: 'Staging demo blender',
+      category: 'appliances',
+      store: 'Staging demo kitchen store',
+      purchase_date: r(-265),
+      price_cents: 5900,
+      warranty_months: 12,
+      warranty_expires_on: r(100), // three months left, quiet
+      return_deadline: r(-235),
+      serial_number: null,
+      receipt_file_id: null,
+      receipt_url: null,
+      manual_url: null,
+      manual_file_id: null,
+      manual_file_url: null,
+    },
   ];
 }
 

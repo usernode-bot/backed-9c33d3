@@ -194,13 +194,14 @@
              or error (it did not load). -->
         <div id="home-loading" role="status">
           <span class="sr-only">Loading your items</span>
-          <div class="list">
-            <div class="list-row"><div class="skeleton h-12 w-12"></div><div class="skeleton h-4 flex-1"></div></div>
-            <div class="list-row"><div class="skeleton h-12 w-12"></div><div class="skeleton h-4 w-2/3"></div></div>
-            <div class="list-row"><div class="skeleton h-12 w-12"></div><div class="skeleton h-4 w-1/2"></div></div>
+          <div class="flex flex-col gap-3">
+            <div class="card flex gap-3"><div class="skeleton h-16 w-16 shrink-0"></div><div class="flex flex-1 flex-col gap-2"><div class="skeleton h-4 w-2/3"></div><div class="skeleton h-4 w-1/2"></div><div class="skeleton mt-auto h-1.5 w-full"></div></div></div>
+            <div class="card flex gap-3"><div class="skeleton h-16 w-16 shrink-0"></div><div class="flex flex-1 flex-col gap-2"><div class="skeleton h-4 w-1/2"></div><div class="skeleton h-4 w-2/3"></div><div class="skeleton mt-auto h-1.5 w-full"></div></div></div>
+            <div class="card flex gap-3"><div class="skeleton h-16 w-16 shrink-0"></div><div class="flex flex-1 flex-col gap-2"><div class="skeleton h-4 w-3/4"></div><div class="skeleton h-4 w-1/3"></div><div class="skeleton mt-auto h-1.5 w-full"></div></div></div>
           </div>
         </div>
-        <ul id="home-list" class="list" hidden></ul>
+        <!-- One card per item: you tap the card to open the item. -->
+        <ul id="home-list" class="flex flex-col gap-3" hidden></ul>
         <div id="home-empty" class="state-empty" hidden>
           <svg class="h-8 w-8 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 4.5A2.25 2.25 0 0 1 8.25 2.25h7.5L19.5 6v13.5a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5v-15A1.5 1.5 0 0 1 6 4.5Z"/><path stroke-linecap="round" d="M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg>
           <p class="text-heading">No items yet</p>
@@ -476,36 +477,106 @@
         for (var name in homeViews) homeViews[name].hidden = name !== state;
       }
 
+      // Warranty left, as on the card: whole calendar months (UTC, from the
+      // same clamped month arithmetic the server uses), then days under a
+      // month. Tone: more than 6 months good, 1 to 6 months soon, under a
+      // month or ended ending. Computed from the row's own dates, never stored.
+      function addMonths(s, m) {
+        var p = s.split('-');
+        var day = +p[2];
+        var t = new Date(Date.UTC(+p[0], +p[1] - 1 + m, day));
+        if (t.getUTCDate() !== day) t.setUTCDate(0);
+        return t.toISOString().slice(0, 10);
+      }
+      function daysBetween(a, b) {
+        var pa = a.split('-'), pb = b.split('-');
+        return Math.round((Date.UTC(+pb[0], +pb[1] - 1, +pb[2]) - Date.UTC(+pa[0], +pa[1] - 1, +pa[2])) / 86400000);
+      }
+      var TONES = {
+        good: { fill: 'bg-accent', track: 'bg-raised', text: 'text-muted' },
+        soon: { fill: 'bg-warn', track: 'bg-raised', text: 'text-warn' },
+        ending: { fill: 'bg-danger', track: 'bg-danger/15', text: 'text-danger' },
+      };
+      function warrantyLeft(item) {
+        var end = item.warranty_expires_on;
+        if (!end) return null;
+        var today = todayStr();
+        var days = daysBetween(today, end);
+        if (days < 0) return { tone: 'ending', label: 'Garansi habis', fraction: 0 };
+        var months = 0;
+        while (months < 1200 && addMonths(today, months + 1) <= end) months++;
+        var tone = addMonths(today, 6) < end ? 'good' : (months >= 1 ? 'soon' : 'ending');
+        var label = days === 0 ? 'Garansi habis hari ini'
+          : months >= 1 ? 'Sisa ' + months + ' bulan' : 'Sisa ' + days + ' hari';
+        var start = item.purchase_date
+          || (item.warranty_months ? addMonths(end, -item.warranty_months) : null);
+        var total = start ? daysBetween(start, end) : 0;
+        var fraction = total > 0 ? Math.min(1, days / total) : 1;
+        return { tone: tone, label: label, fraction: fraction };
+      }
+
       function itemRow(item) {
         var li = document.createElement('li');
         var btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'list-row w-full text-left hover:bg-raised';
+        btn.className = 'card flex w-full gap-3 text-left hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
         var thumb = document.createElement('span');
-        thumb.className = 'flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-raised';
+        thumb.className = 'flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-raised';
         if (item.receipt_url) {
           var img = document.createElement('img');
           img.src = receiptSrc(item.receipt_url);
           img.alt = '';
-          img.className = 'h-12 w-12 object-cover';
+          img.className = 'h-16 w-16 object-cover';
           thumb.appendChild(img);
         } else {
-          thumb.innerHTML = '<svg class="h-5 w-5 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 4.5A2.25 2.25 0 0 1 8.25 2.25h7.5L19.5 6v13.5a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5v-15A1.5 1.5 0 0 1 6 4.5Z"/><path stroke-linecap="round" d="M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg>';
+          thumb.innerHTML = '<svg class="h-6 w-6 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 4.5A2.25 2.25 0 0 1 8.25 2.25h7.5L19.5 6v13.5a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5v-15A1.5 1.5 0 0 1 6 4.5Z"/><path stroke-linecap="round" d="M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg>';
         }
-        var mid = document.createElement('span');
-        mid.className = 'min-w-0 flex-1';
-        var name = document.createElement('p');
-        name.className = 'text-body font-medium truncate';
+        var body = document.createElement('span');
+        body.className = 'flex min-w-0 flex-1 flex-col gap-1';
+        var top = document.createElement('span');
+        top.className = 'flex items-start justify-between gap-2';
+        var name = document.createElement('span');
+        name.className = 'min-w-0 break-words text-body font-medium';
         name.textContent = item.name;
-        var meta = document.createElement('p');
-        meta.className = 'text-small text-muted truncate';
-        var parts = [];
-        if (item.store) parts.push(item.store);
-        if (item.purchase_date) parts.push('Purchased ' + fmtDate(item.purchase_date));
-        if (item.price_cents !== null && item.price_cents !== undefined) parts.push(fmtPrice(item.price_cents));
-        meta.textContent = parts.join(' · ');
-        mid.append(name, meta);
-        btn.append(thumb, mid, chipEl(item.status));
+        top.append(name, chipEl(item.status));
+        var store = document.createElement('span');
+        store.className = 'text-small text-muted truncate';
+        store.textContent = item.store || 'No store';
+        body.append(top, store);
+
+        var w = warrantyLeft(item);
+        var foot = document.createElement('span');
+        foot.className = 'mt-1 flex items-center gap-3';
+        var label = document.createElement('span');
+        label.className = 'warranty-left shrink-0 text-small font-medium';
+        label.setAttribute('aria-hidden', 'true');
+        if (w) {
+          var tone = TONES[w.tone];
+          li.setAttribute('data-warranty-tone', w.tone);
+          var track = document.createElement('span');
+          track.className = 'h-1.5 min-w-0 flex-1 overflow-hidden rounded-full ' + tone.track;
+          track.setAttribute('role', 'progressbar');
+          track.setAttribute('aria-label', 'Garansi tersisa');
+          track.setAttribute('aria-valuemin', '0');
+          track.setAttribute('aria-valuemax', '100');
+          track.setAttribute('aria-valuenow', String(Math.round(w.fraction * 100)));
+          track.setAttribute('aria-valuetext', w.label);
+          var fill = document.createElement('span');
+          fill.className = 'block h-full rounded-full ' + tone.fill;
+          fill.style.width = (w.fraction * 100).toFixed(1) + '%';
+          track.appendChild(fill);
+          label.className += ' ' + tone.text;
+          label.textContent = w.label;
+          foot.append(track, label);
+        } else {
+          li.setAttribute('data-warranty-tone', 'none');
+          label.className += ' text-muted';
+          label.removeAttribute('aria-hidden');
+          label.textContent = 'Tanpa garansi';
+          foot.append(label);
+        }
+        body.append(foot);
+        btn.append(thumb, body);
         btn.addEventListener('click', function () { nav('/item/' + item.id); });
         li.appendChild(btn);
         return li;
@@ -537,7 +608,7 @@
           var rows = [];
           order.forEach(function (key) {
             var h = document.createElement('h3');
-            h.className = 'bg-raised px-4 py-2 text-small font-medium text-muted';
+            h.className = 'section-label mb-0 mt-3';
             h.textContent = groups[key].label;
             var header = document.createElement('li');
             header.appendChild(h);
