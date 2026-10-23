@@ -202,9 +202,40 @@
         </div>
         <ul id="home-list" class="list" hidden></ul>
         <div id="home-empty" class="state-empty" hidden>
-          <svg class="h-8 w-8 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 4.5A2.25 2.25 0 0 1 8.25 2.25h7.5L19.5 6v13.5a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5v-15A1.5 1.5 0 0 1 6 4.5Z"/><path stroke-linecap="round" d="M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg>
-          <p class="text-heading">No items yet</p>
-          <p class="text-body text-muted">Add your first receipt to start tracking warranties.</p>
+          <p class="text-heading">Keep every warranty in one place</p>
+          <ol class="mt-2 flex w-full max-w-xs flex-col gap-3 text-left">
+            <li class="flex items-center gap-3">
+              <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-raised text-accent">
+                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linejoin="round" d="M3 8.25A2.25 2.25 0 0 1 5.25 6h1.9l1.35-2h7l1.35 2h1.9A2.25 2.25 0 0 1 21 8.25v9.5A2.25 2.25 0 0 1 18.75 20H5.25A2.25 2.25 0 0 1 3 17.75v-9.5Z"/><circle cx="12" cy="13" r="3.5"/></svg>
+              </span>
+              <span>
+                <span class="block text-small text-muted">Step 1</span>
+                <span class="block text-body font-medium">Photograph your receipt</span>
+              </span>
+            </li>
+            <li class="flex items-center gap-3">
+              <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-raised text-accent">
+                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linejoin="round" d="M12 2.75 4.5 5.5v6c0 4.5 3.2 8.2 7.5 9.75 4.3-1.55 7.5-5.25 7.5-9.75v-6L12 2.75Z"/><path stroke-linecap="round" stroke-linejoin="round" d="m8.75 12 2.25 2.25 4.25-4.5"/></svg>
+              </span>
+              <span>
+                <span class="block text-small text-muted">Step 2</span>
+                <span class="block text-body font-medium">Backed records the warranty for you</span>
+              </span>
+            </li>
+            <li class="flex items-center gap-3">
+              <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-raised text-accent">
+                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 10a6 6 0 1 1 12 0c0 4 1.5 6 2 7H4c.5-1 2-3 2-7Z"/><path stroke-linecap="round" d="M10 20a2 2 0 0 0 4 0"/></svg>
+              </span>
+              <span>
+                <span class="block text-small text-muted">Step 3</span>
+                <span class="block text-body font-medium">Get a reminder before it runs out</span>
+              </span>
+            </li>
+          </ol>
+          <p class="text-body text-muted">Tap Add receipt to start.</p>
+        </div>
+        <div id="home-nomatch" class="state-empty" hidden>
+          <p class="text-body text-muted">No matching items</p>
         </div>
         <div id="home-error" class="state-error" hidden>
           <svg class="h-6 w-6 text-danger" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
@@ -470,6 +501,7 @@
         loading: $('home-loading'),
         list: $('home-list'),
         empty: $('home-empty'),
+        nomatch: $('home-nomatch'),
         error: $('home-error'),
       };
       function showHome(state) {
@@ -571,7 +603,9 @@
           remSection.hidden = true;
         }
 
-        showHome(items.length ? 'list' : 'empty');
+        if (items.length) showHome('list');
+        else if (homeQuery.q || homeQuery.filter === 'expiring') showHome('nomatch');
+        else showHome('empty');
         if (items.length) {
           var rows = homeQuery.sort === 'store' ? groupedRows(items) : items.map(itemRow);
           homeViews.list.replaceChildren.apply(homeViews.list, rows);

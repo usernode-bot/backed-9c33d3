@@ -6,7 +6,7 @@
     "suggested_daily_cap_cents": 100
   },
   "tests": [
-    { "name": "Home empty state", "path": "/", "expectText": "No items yet" },
+    { "name": "Home empty state", "path": "/", "expectText": "Keep every warranty in one place" },
     {
       "id": "items.sort-chips",
       "name": "Sort chips render",
