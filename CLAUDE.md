@@ -80,8 +80,9 @@ after save are deferred.
 
 - **Palette:** accent teal (stone-warm neutrals; `warn` amber is the one
   "act soon" colour). Token values live in `styles/tailwind-input.css`.
-- **Signature element:** the status chip and receipt thumbnail on each item
-  row — the colored badge that tells you at a glance what's still covered.
+- **Signature element:** the item card on Home: receipt thumbnail, status
+  chip and the coloured warranty bar with its time-left line ("11 months
+  left").
 - **Type scale:** `text-title`, `text-heading`, `text-body`, `text-small`
   (unchanged from the kit; do not add sizes).
 
@@ -103,6 +104,9 @@ Re-theme by changing the token values there, keeping every text pair at
 - Statuses use fixed chip pairs: `bg-accent text-on-accent` (Return window),
   `bg-warn text-on-warn` (Warranty ending soon), `bg-accent/10 text-accent`
   (Covered), `bg-raised text-muted` (Expired).
+- The warranty bar fills `bg-accent` above 30 days, `bg-warn` at 30 days or
+  fewer, and is a `bg-danger/30` track with no fill once the warranty has
+  ended. No bar without a warranty.
 - No cards in cards, no uppercase eyebrows, no emoji as icons.
 
 ## App-specific conventions

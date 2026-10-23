@@ -24,6 +24,12 @@
       "impact": ["public/**", "server.js", "styles/**", "dapp.json"]
     },
     {
+      "id": "items.warranty-bar",
+      "name": "Item cards show warranty time left",
+      "path": "/?demo=1",
+      "expectText": "months left"
+    },
+    {
       "id": "items.add-form",
       "name": "Add/confirm form renders",
       "path": "/add",

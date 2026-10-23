@@ -194,13 +194,40 @@
              or error (it did not load). -->
         <div id="home-loading" role="status">
           <span class="sr-only">Loading your items</span>
-          <div class="list">
-            <div class="list-row"><div class="skeleton h-12 w-12"></div><div class="skeleton h-4 flex-1"></div></div>
-            <div class="list-row"><div class="skeleton h-12 w-12"></div><div class="skeleton h-4 w-2/3"></div></div>
-            <div class="list-row"><div class="skeleton h-12 w-12"></div><div class="skeleton h-4 w-1/2"></div></div>
+          <div class="flex flex-col gap-3">
+            <div class="card flex flex-col gap-3">
+              <div class="flex items-center gap-3">
+                <div class="skeleton h-12 w-12"></div>
+                <div class="flex min-w-0 flex-1 flex-col gap-2">
+                  <div class="skeleton h-4 w-2/3"></div>
+                  <div class="skeleton h-3 w-1/2"></div>
+                </div>
+              </div>
+              <div class="skeleton h-2 w-full rounded-full"></div>
+            </div>
+            <div class="card flex flex-col gap-3">
+              <div class="flex items-center gap-3">
+                <div class="skeleton h-12 w-12"></div>
+                <div class="flex min-w-0 flex-1 flex-col gap-2">
+                  <div class="skeleton h-4 w-2/3"></div>
+                  <div class="skeleton h-3 w-1/2"></div>
+                </div>
+              </div>
+              <div class="skeleton h-2 w-full rounded-full"></div>
+            </div>
+            <div class="card flex flex-col gap-3">
+              <div class="flex items-center gap-3">
+                <div class="skeleton h-12 w-12"></div>
+                <div class="flex min-w-0 flex-1 flex-col gap-2">
+                  <div class="skeleton h-4 w-2/3"></div>
+                  <div class="skeleton h-3 w-1/2"></div>
+                </div>
+              </div>
+              <div class="skeleton h-2 w-full rounded-full"></div>
+            </div>
           </div>
         </div>
-        <ul id="home-list" class="list" hidden></ul>
+        <ul id="home-list" class="flex flex-col gap-3" hidden></ul>
         <div id="home-empty" class="state-empty" hidden>
           <svg class="h-8 w-8 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 4.5A2.25 2.25 0 0 1 8.25 2.25h7.5L19.5 6v13.5a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5v-15A1.5 1.5 0 0 1 6 4.5Z"/><path stroke-linecap="round" d="M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg>
           <p class="text-heading">No items yet</p>
@@ -390,6 +417,14 @@
         return new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]) + n * 86400000)
           .toISOString().slice(0, 10);
       }
+      // Whole UTC days from a to b, both YYYY-MM-DD strings.
+      function daysBetween(a, b) {
+        var pa = a.split('-');
+        var pb = b.split('-');
+        return Math.round(
+          (Date.UTC(+pb[0], +pb[1] - 1, +pb[2]) - Date.UTC(+pa[0], +pa[1] - 1, +pa[2])) / 86400000
+        );
+      }
       function todayStr() {
         var now = (window.usernode && window.usernode.now) ? window.usernode.now() : new Date();
         return now.toISOString().slice(0, 10);
@@ -476,11 +511,34 @@
         for (var name in homeViews) homeViews[name].hidden = name !== state;
       }
 
+      // Share of the warranty still left, 0 to 1, from the purchase date to
+      // the warranty end date. A total of 0 (or a future purchase date) with
+      // days left is treated as full.
+      function warrantyShare(item) {
+        var total = daysBetween(item.purchase_date, item.warranty_expires_on);
+        var n = item.warranty_days_left;
+        var share = total > 0 ? n / total : (n >= 0 ? 1 : 0);
+        return Math.max(0, Math.min(1, share));
+      }
+
+      // The line beside the warranty bar. Months (rounded) from 60 days;
+      // days below that. Unlike countdownPhrase (detail screen), this reads
+      // "Ends today" / "Warranty ended" for the warranty.
+      function warrantyLeftText(n) {
+        if (n >= 60) return Math.round(n / 30.44) + ' months left';
+        if (n > 1) return n + ' days left';
+        if (n === 1) return '1 day left';
+        if (n === 0) return 'Ends today';
+        return 'Warranty ended';
+      }
+
       function itemRow(item) {
         var li = document.createElement('li');
         var btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'list-row w-full text-left hover:bg-raised';
+        btn.className = 'card flex w-full flex-col gap-3 text-left hover:bg-raised';
+        var top = document.createElement('span');
+        top.className = 'flex items-center gap-3';
         var thumb = document.createElement('span');
         thumb.className = 'flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-raised';
         if (item.receipt_url) {
@@ -505,7 +563,35 @@
         if (item.price_cents !== null && item.price_cents !== undefined) parts.push(fmtPrice(item.price_cents));
         meta.textContent = parts.join(' · ');
         mid.append(name, meta);
-        btn.append(thumb, mid, chipEl(item.status));
+        top.append(thumb, mid, chipEl(item.status));
+        btn.appendChild(top);
+
+        // The warranty bar: only when the item has an expiry and a day count.
+        if (item.warranty_expires_on && item.warranty_days_left !== null
+            && item.warranty_days_left !== undefined) {
+          var n = item.warranty_days_left;
+          var barRow = document.createElement('span');
+          barRow.className = 'flex items-center gap-3';
+          var meter = document.createElement('span');
+          meter.setAttribute('aria-hidden', 'true');
+          if (n < 0) {
+            meter.className = 'meter flex-1 bg-danger/30';
+          } else {
+            meter.className = 'meter flex-1';
+            var fill = document.createElement('span');
+            fill.className = n <= 30 ? 'meter-fill bg-warn' : 'meter-fill bg-accent';
+            var pct = warrantyShare(item) * 100;
+            if (pct < 4) pct = 4;
+            fill.style.width = pct + '%';
+            meter.appendChild(fill);
+          }
+          var left = document.createElement('span');
+          left.className = 'shrink-0 text-small text-muted';
+          left.textContent = warrantyLeftText(n);
+          barRow.append(meter, left);
+          btn.appendChild(barRow);
+        }
+
         btn.addEventListener('click', function () { nav('/item/' + item.id); });
         li.appendChild(btn);
         return li;
@@ -537,7 +623,7 @@
           var rows = [];
           order.forEach(function (key) {
             var h = document.createElement('h3');
-            h.className = 'bg-raised px-4 py-2 text-small font-medium text-muted';
+            h.className = 'section-label mb-0 pt-2';
             h.textContent = groups[key].label;
             var header = document.createElement('li');
             header.appendChild(h);

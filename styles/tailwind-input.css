@@ -121,6 +121,17 @@
     @apply inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-small font-medium;
   }
 
+  /* A thin progress bar: <span class="meter"><span class="meter-fill bg-accent">.
+     Set the fill's width per use. Colours used in this app: bg-accent
+     (warranty covered) | bg-warn (30 days or fewer) | track bg-danger/30
+     with no fill (warranty ended). */
+  .meter {
+    @apply block h-2 w-full overflow-hidden rounded-full bg-line;
+  }
+  .meter-fill {
+    @apply block h-full rounded-full;
+  }
+
   /* The states of anything that loads data. Show exactly one at a time:
      - loading: .skeleton shapes where the data will be, never a blank;
      - empty, only when the load WORKED and found nothing: a title, one
