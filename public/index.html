@@ -206,6 +206,45 @@
           <p class="text-heading">No items yet</p>
           <p class="text-body text-muted">Add your first receipt to start tracking warranties.</p>
         </div>
+        <!-- First run: no items at all (no search or filter active). Explains
+             what Backed does in three steps and ends with the add action,
+             which stands in for the bottom add bar while this shows. -->
+        <div id="home-welcome" class="flex flex-col gap-6 py-2" hidden>
+          <div class="flex flex-col gap-1">
+            <p class="text-heading">No items yet</p>
+            <p class="text-body text-muted">Backed keeps your receipts and warns you before a warranty runs out.</p>
+          </div>
+          <ol class="flex flex-col gap-4" aria-label="How Backed works">
+            <li class="flex items-start gap-4">
+              <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+              </span>
+              <div class="min-w-0 flex-1">
+                <p class="text-body font-medium">1. Photograph your receipt</p>
+                <p class="text-small text-muted">Backed reads the store, item, date and price for you.</p>
+              </div>
+            </li>
+            <li class="flex items-start gap-4">
+              <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+              </span>
+              <div class="min-w-0 flex-1">
+                <p class="text-body font-medium">2. The warranty is recorded for you</p>
+                <p class="text-small text-muted">Backed suggests the warranty length and tracks the return deadline.</p>
+              </div>
+            </li>
+            <li class="flex items-start gap-4">
+              <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.27 21a2 2 0 0 0 3.46 0"/><path d="M3.26 15.33A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.67C19.41 13.96 18 12.5 18 8A6 6 0 0 0 6 8c0 4.5-1.41 5.96-2.74 7.33"/></svg>
+              </span>
+              <div class="min-w-0 flex-1">
+                <p class="text-body font-medium">3. Get reminded before it ends</p>
+                <p class="text-small text-muted">A reminder shows on Home 30, 7 and 1 day before the warranty runs out.</p>
+              </div>
+            </li>
+          </ol>
+          <button type="button" id="welcome-add" class="btn-primary h-14 w-full">Add your first receipt</button>
+        </div>
         <div id="home-error" class="state-error" hidden>
           <svg class="h-6 w-6 text-danger" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
           <p class="text-heading">Couldn't load your items</p>
@@ -470,10 +509,13 @@
         loading: $('home-loading'),
         list: $('home-list'),
         empty: $('home-empty'),
+        welcome: $('home-welcome'),
         error: $('home-error'),
       };
       function showHome(state) {
         for (var name in homeViews) homeViews[name].hidden = name !== state;
+        // The welcome screen ends with its own add button.
+        addBar.hidden = state === 'welcome';
       }
 
       function itemRow(item) {
@@ -571,7 +613,8 @@
           remSection.hidden = true;
         }
 
-        showHome(items.length ? 'list' : 'empty');
+        var narrowed = homeQuery.q || homeQuery.filter !== 'all';
+        showHome(items.length ? 'list' : (narrowed ? 'empty' : 'welcome'));
         if (items.length) {
           var rows = homeQuery.sort === 'store' ? groupedRows(items) : items.map(itemRow);
           homeViews.list.replaceChildren.apply(homeViews.list, rows);
@@ -662,6 +705,7 @@
       document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closePhoto(); });
       $('home-retry').addEventListener('click', loadHome);
       $('home-add').addEventListener('click', function () { nav('/add'); });
+      $('welcome-add').addEventListener('click', function () { nav('/add'); });
 
       // ── Add: capture, OCR prefill, confirm ────────────────────────────
       var WARRANTY_SUGGESTION = { electronics: 12, appliances: 24, furniture: 12, clothing: 0, other: 12 };
