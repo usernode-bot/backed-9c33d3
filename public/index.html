@@ -155,18 +155,18 @@
            the search matches. Tapping a card filters the list to it; tapping
            the selected card again clears the filter. -->
       <section id="summary" hidden>
-        <div class="grid grid-cols-3 gap-2" role="group" aria-label="Ringkasan status">
+        <div class="grid grid-cols-3 gap-2" role="group" aria-label="Status summary">
           <button type="button" id="summary-active" class="card flex flex-col items-start gap-1 text-left hover:bg-raised" aria-pressed="false">
             <span id="summary-active-count" class="text-title">0</span>
-            <span class="flex items-center gap-1.5 text-small text-muted"><span class="h-2 w-2 shrink-0 rounded-full bg-accent" aria-hidden="true"></span>Aktif</span>
+            <span class="flex items-center gap-1.5 text-small text-muted"><span class="h-2 w-2 shrink-0 rounded-full bg-accent" aria-hidden="true"></span>Active</span>
           </button>
           <button type="button" id="summary-expiring" class="card flex flex-col items-start gap-1 text-left hover:bg-raised" aria-pressed="false">
             <span id="summary-expiring-count" class="text-title">0</span>
-            <span class="flex items-center gap-1.5 text-small text-muted"><span class="h-2 w-2 shrink-0 rounded-full bg-warn" aria-hidden="true"></span>Segera habis</span>
+            <span class="flex items-center gap-1.5 text-small text-muted"><span class="h-2 w-2 shrink-0 rounded-full bg-warn" aria-hidden="true"></span>Expiring soon</span>
           </button>
           <button type="button" id="summary-expired" class="card flex flex-col items-start gap-1 text-left hover:bg-raised" aria-pressed="false">
             <span id="summary-expired-count" class="text-title">0</span>
-            <span class="flex items-center gap-1.5 text-small text-muted"><span class="h-2 w-2 shrink-0 rounded-full bg-muted" aria-hidden="true"></span>Sudah habis</span>
+            <span class="flex items-center gap-1.5 text-small text-muted"><span class="h-2 w-2 shrink-0 rounded-full bg-muted" aria-hidden="true"></span>Expired</span>
           </button>
         </div>
       </section>
@@ -180,9 +180,9 @@
         <input id="search" class="field" type="search" placeholder="Search items or stores"
                aria-label="Search items or stores" autocomplete="off">
         <div class="flex flex-wrap gap-2" role="group" aria-label="Show items">
-          <button type="button" id="filter-all" class="chip bg-accent text-on-accent" aria-pressed="true">All</button>
-          <button type="button" id="filter-expiring" class="chip bg-raised text-muted" aria-pressed="false">Expiring soon</button>
-          <button type="button" id="filter-store" class="chip bg-raised text-muted" aria-pressed="false">By store</button>
+          <button type="button" id="filter-all" class="chip chip-tap bg-accent text-on-accent" aria-pressed="true">All</button>
+          <button type="button" id="filter-expiring" class="chip chip-tap bg-raised text-muted" aria-pressed="false">Expiring soon</button>
+          <button type="button" id="filter-store" class="chip chip-tap bg-raised text-muted" aria-pressed="false">By store</button>
         </div>
       </section>
 
@@ -200,8 +200,8 @@
           </div>
         </div>
         <!-- One card per item: you tap the card to open the item. -->
-        <ul id="home-list" class="flex flex-col gap-3" hidden></ul>
-        <p id="home-filtered-empty" class="px-1 py-4 text-body text-muted" hidden>Tidak ada barang dengan status ini.</p>
+        <ul id="home-list" class="flex flex-col gap-3 pb-20" hidden></ul>
+        <p id="home-filtered-empty" class="px-1 py-4 text-body text-muted" hidden>No items with this status.</p>
         <div id="home-empty" class="state-empty" hidden>
           <svg class="h-8 w-8 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 4.5A2.25 2.25 0 0 1 8.25 2.25h7.5L19.5 6v13.5a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5v-15A1.5 1.5 0 0 1 6 4.5Z"/><path stroke-linecap="round" d="M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg>
           <p class="text-heading">No items yet</p>
@@ -581,12 +581,12 @@
         if (!end) return null;
         var today = todayStr();
         var days = daysBetween(today, end);
-        if (days < 0) return { tone: 'ending', label: 'Garansi habis', fraction: 0 };
+        if (days < 0) return { tone: 'ending', label: 'Warranty expired', fraction: 0 };
         var months = 0;
         while (months < 1200 && addMonths(today, months + 1) <= end) months++;
         var tone = addMonths(today, 6) < end ? 'good' : (months >= 1 ? 'soon' : 'ending');
-        var label = days === 0 ? 'Garansi habis hari ini'
-          : months >= 1 ? 'Sisa ' + months + ' bulan' : 'Sisa ' + days + ' hari';
+        var label = days === 0 ? 'Warranty ends today'
+          : months >= 1 ? months + (months === 1 ? ' month left' : ' months left') : days + (days === 1 ? ' day left' : ' days left');
         var start = item.purchase_date
           || (item.warranty_months ? addMonths(end, -item.warranty_months) : null);
         var total = start ? daysBetween(start, end) : 0;
@@ -613,9 +613,9 @@
         var body = document.createElement('span');
         body.className = 'flex min-w-0 flex-1 flex-col gap-1';
         var top = document.createElement('span');
-        top.className = 'flex items-start justify-between gap-2';
+        top.className = 'flex flex-col items-start gap-1';
         var name = document.createElement('span');
-        name.className = 'min-w-0 break-words text-body font-medium';
+        name.className = 'w-full min-w-0 break-words text-body font-medium';
         name.textContent = item.name;
         top.append(name, chipEl(item.status));
         var store = document.createElement('span');
@@ -635,7 +635,7 @@
           var track = document.createElement('span');
           track.className = 'h-1.5 min-w-0 flex-1 overflow-hidden rounded-full ' + tone.track;
           track.setAttribute('role', 'progressbar');
-          track.setAttribute('aria-label', 'Garansi tersisa');
+          track.setAttribute('aria-label', 'Warranty remaining');
           track.setAttribute('aria-valuemin', '0');
           track.setAttribute('aria-valuemax', '100');
           track.setAttribute('aria-valuenow', String(Math.round(w.fraction * 100)));
@@ -651,7 +651,7 @@
           li.setAttribute('data-warranty-tone', 'none');
           label.className += ' text-muted';
           label.removeAttribute('aria-hidden');
-          label.textContent = 'Tanpa garansi';
+          label.textContent = 'No warranty';
           foot.append(label);
         }
         body.append(foot);
@@ -780,8 +780,8 @@
         }, 250);
       });
 
-      var FILTER_ON = 'chip bg-accent text-on-accent';
-      var FILTER_OFF = 'chip bg-raised text-muted';
+      var FILTER_ON = 'chip chip-tap bg-accent text-on-accent';
+      var FILTER_OFF = 'chip chip-tap bg-raised text-muted';
       var CARD_ON = 'card flex flex-col items-start gap-1 text-left border-accent bg-accent/10 ring-1 ring-accent';
       var CARD_OFF = 'card flex flex-col items-start gap-1 text-left hover:bg-raised';
       // One row of chips: each sets the filter and the order together.

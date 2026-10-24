@@ -53,8 +53,8 @@
     { "name": "Demo detail manual link", "path": "/item/900004?demo=1", "expectText": "Open manual" },
     { "name": "Add form manual field", "path": "/add", "expectSelector": "#f-manual-url" },
     { "name": "Item cards: yellow warranty bar", "path": "/?demo=1", "expectSelector": "[data-warranty-tone='soon'] [role='progressbar']" },
-    { "name": "Item cards: months left in Indonesian", "path": "/?demo=1", "expectText": "Sisa 3 bulan" },
-    { "name": "Item cards: expired warranty", "path": "/?demo=1", "expectText": "Garansi habis" },
+    { "name": "Item cards: months left", "path": "/?demo=1", "expectText": "3 months left" },
+    { "name": "Item cards: expired warranty", "path": "/?demo=1", "expectText": "Warranty expired" },
     {
       "id": "items.status-summary",
       "name": "Status summary cards",
@@ -63,7 +63,7 @@
       "visual": true,
       "impact": ["public/index.html"]
     },
-    { "name": "Status summary label", "path": "/?demo=1", "expectText": "Segera habis" }
+    { "name": "Status summary label", "path": "/?demo=1", "expectText": "Expiring soon" }
   ],
   "icon": {
     "image": "brand/icon.png",
