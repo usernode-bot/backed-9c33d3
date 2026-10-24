@@ -193,6 +193,13 @@ function addMonths(dateStr, m) {
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const CATEGORIES = ['electronics', 'appliances', 'furniture', 'clothing', 'other'];
+// A BCP-47 tag, short enough to sit safely in a prompt and a column.
+const LANG_RE = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/;
+function cleanLanguage(v) {
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  return s.length <= 35 && LANG_RE.test(s) ? s : null;
+}
 
 /* ── Status and reminders ─────────────────────────────────────────────────
  * Status is computed at read time from the row's dates against req.now,
@@ -254,7 +261,8 @@ const ITEM_COLUMNS = `
   warranty_expires_on::text AS warranty_expires_on,
   return_deadline::text AS return_deadline,
   serial_number, receipt_file_id, receipt_url,
-  manual_url, manual_file_id, manual_file_url, created_at
+  manual_url, manual_file_id, manual_file_url,
+  name_original, name_language, created_at
 `;
 
 /* ── Staging demo data ────────────────────────────────────────────────────
@@ -303,6 +311,8 @@ function demoItems(today) {
       manual_url: null,
       manual_file_id: null,
       manual_file_url: null,
+      name_original: null,
+      name_language: null,
     },
     {
       id: 900002,
@@ -320,6 +330,8 @@ function demoItems(today) {
       manual_url: null,
       manual_file_id: null,
       manual_file_url: null,
+      name_original: 'Staging demo penanak nasi',
+      name_language: 'en',
     },
     {
       id: 900003,
@@ -337,6 +349,8 @@ function demoItems(today) {
       manual_url: null,
       manual_file_id: null,
       manual_file_url: null,
+      name_original: null,
+      name_language: null,
     },
     {
       id: 900004,
@@ -354,6 +368,8 @@ function demoItems(today) {
       manual_url: 'https://example.com/staging-demo-laptop-manual',
       manual_file_id: null,
       manual_file_url: null,
+      name_original: null,
+      name_language: null,
     },
     {
       id: 900005,
@@ -371,6 +387,8 @@ function demoItems(today) {
       manual_url: null,
       manual_file_id: null,
       manual_file_url: null,
+      name_original: null,
+      name_language: null,
     },
     {
       id: 900006,
@@ -388,6 +406,8 @@ function demoItems(today) {
       manual_url: null,
       manual_file_id: null,
       manual_file_url: null,
+      name_original: null,
+      name_language: null,
     },
   ];
 }
@@ -475,6 +495,12 @@ app.post('/api/items', async (req, res) => {
     // The warranty end date is decided once, at save time.
     const warrantyExpires = purchase && months ? addMonths(purchase, months) : null;
     const returnDeadline = DATE_RE.test(b.return_deadline || '') ? b.return_deadline : null;
+    // The receipt's own wording, kept only when the page says it differs
+    // from the (translated) name that was saved.
+    const nameOriginalRaw = typeof b.name_original === 'string' ? b.name_original.trim() : '';
+    const nameOriginal = nameOriginalRaw.length >= 1 && nameOriginalRaw.length <= 120
+      ? nameOriginalRaw : null;
+    const nameLanguage = nameOriginal ? cleanLanguage(b.name_language) : null;
     // Optional product manual link. Must be a real web address with an
     // http(s) scheme, so it can never run anything inside Backed; the
     // stored value is the trimmed input as typed. The page shows the error
@@ -500,8 +526,10 @@ app.post('/api/items', async (req, res) => {
       INSERT INTO items
         (user_id, username, name, category, store, purchase_date, price_cents,
          warranty_months, warranty_expires_on, return_deadline, serial_number,
-         receipt_file_id, receipt_url, manual_url, manual_file_id, manual_file_url)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+         receipt_file_id, receipt_url, manual_url, manual_file_id, manual_file_url,
+         name_original, name_language)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+              $17, $18)
       RETURNING id
     `, [
       req.user.id, req.user.username, name, category,
@@ -517,6 +545,8 @@ app.post('/api/items', async (req, res) => {
       manualUrl,
       typeof b.manual_file_id === 'string' ? b.manual_file_id : null,
       typeof b.manual_file_url === 'string' ? b.manual_file_url : null,
+      nameOriginal,
+      nameLanguage,
     ]);
     res.json({ ok: true, id: rows[0].id });
   } catch (err) {
@@ -560,17 +590,26 @@ app.delete('/api/items/:id', async (req, res) => {
 // Receipt OCR. The photo is already stored platform-side (the page uploads
 // it with usernode.uploadFile); this call reads it through the platform's
 // LLM proxy, billed to the user's own grant. Stateless: it never writes.
-const OCR_PROMPT = `You read receipt photos for Backed, a warranty tracker. ` +
+const OCR_PROMPT_HEAD = `You read receipt photos for Backed, a warranty tracker. ` +
   `Extract from this receipt photo: the store name, the item name (the main ` +
   `product bought), the purchase date, and the total price paid.\n` +
   `Reply with ONLY a JSON object, no other text:\n` +
   `{"store": string or null, "item_name": string or null, ` +
+  `"item_name_translated": string or null, ` +
   `"purchase_date": "YYYY-MM-DD" or null, "price_cents": integer or null, ` +
   `"low_confidence": boolean}\n` +
+  `Translate the item name into the language with BCP-47 tag `;
+const OCR_PROMPT_TAIL =
+  `, keeping brand names, model numbers and sizes. ` +
+  `If it is already in that language, repeat it unchanged.\n` +
   `Set low_confidence true when the photo is faded, blurry, or any value is ` +
   `a guess or missing. If the image is not a readable receipt, return all ` +
-  `nulls with low_confidence true. Decline and return nulls if the content ` +
-  `is sexual, violent, gambling-related or otherwise disallowed.`;
+  `nulls with low_confidence true. Decline and return nulls for both names ` +
+  `if the content is sexual, violent, gambling-related or otherwise disallowed.`;
+
+function ocrPrompt(language) {
+  return OCR_PROMPT_HEAD + `"${language}"` + OCR_PROMPT_TAIL;
+}
 
 function parseScanJson(text) {
   const start = text.indexOf('{');
@@ -581,6 +620,8 @@ function parseScanJson(text) {
 
 app.post('/api/items/scan', async (req, res) => {
   const { receiptUrl } = req.body || {};
+  const lang = cleanLanguage((req.body || {}).language) ||
+    cleanLanguage(req.user && req.user.locale) || 'en';
   if (!LLM_ENABLED) {
     return res.status(503).json({ error: 'ai_unavailable' });
   }
@@ -603,7 +644,7 @@ app.post('/api/items/scan', async (req, res) => {
           role: 'user',
           content: [
             { type: 'image', source: { type: 'url', url: receiptUrl } },
-            { type: 'text', text: OCR_PROMPT },
+            { type: 'text', text: ocrPrompt(lang) },
           ],
         }],
       }),
@@ -626,9 +667,18 @@ app.post('/api/items/scan', async (req, res) => {
     const text = (data.content || []).map((b) => b.text || '').join('');
     const parsed = parseScanJson(text);
     if (!parsed) return res.status(502).json({ error: 'scan_failed' });
+    const originalName = typeof parsed.item_name === 'string'
+      ? parsed.item_name.trim() || null : null;
+    const translatedName = typeof parsed.item_name_translated === 'string'
+      ? parsed.item_name_translated.trim() || null : null;
+    const differs = originalName && translatedName &&
+      originalName.toLowerCase() !== translatedName.toLowerCase();
+    const nameOriginal = differs ? originalName : null;
     res.json({
       store: typeof parsed.store === 'string' ? parsed.store : null,
-      name: typeof parsed.item_name === 'string' ? parsed.item_name : null,
+      name: translatedName || originalName,
+      name_original: nameOriginal,
+      name_language: nameOriginal ? lang : null,
       purchase_date: DATE_RE.test(parsed.purchase_date || '') ? parsed.purchase_date : null,
       price_cents: Number.isInteger(parsed.price_cents) && parsed.price_cents >= 0
         ? parsed.price_cents : null,
@@ -705,6 +755,8 @@ async function start() {
   await pool.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS manual_url TEXT`);
   await pool.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS manual_file_id TEXT`);
   await pool.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS manual_file_url TEXT`);
+  await pool.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS name_original TEXT`);
+  await pool.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS name_language TEXT`);
   await pool.query(`COMMENT ON TABLE items IS 'staging:private'`);
   const server = app.listen(port, () => console.log(`Listening on :${port}`));
   // Let Envoy retire idle upstream connections at 60s, with a 15s margin.

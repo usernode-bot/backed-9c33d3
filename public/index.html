@@ -284,9 +284,12 @@
         <input type="hidden" id="f-receipt-url">
         <input type="hidden" id="f-manual-file-id">
         <input type="hidden" id="f-manual-file-url">
+        <input type="hidden" id="f-name-original">
+        <input type="hidden" id="f-name-language">
         <label class="flex flex-col gap-1.5">
           <span class="text-small font-medium">Item name</span>
           <input id="f-name" class="field" maxlength="120" autocomplete="off">
+          <p id="f-name-original-note" class="text-small text-muted" hidden></p>
         </label>
         <label class="flex flex-col gap-1.5">
           <span class="text-small font-medium">Store</span>
@@ -376,6 +379,7 @@
           <h1 id="item-name" class="text-heading min-w-0"></h1>
           <span id="item-chip" class="chip"></span>
         </div>
+        <p id="item-name-original" class="text-small text-muted" hidden></p>
         <p id="item-reminder" class="text-small font-medium text-warn" hidden></p>
         <button type="button" id="item-receipt-open" class="block w-full" aria-label="Open receipt photo full-screen" hidden>
           <img id="item-receipt" class="w-full rounded-lg border border-line" alt="Receipt photo">
@@ -947,10 +951,29 @@
         }).catch(function () { return file; });
       }
 
+      // The language the receipt's item name is translated into: the
+      // Homeroom account choice, then the device language, then English.
+      // Never rejects, so a bridge failure just falls through.
+      function viewerLanguage() {
+        var fallback = navigator.language || 'en';
+        if (!(window.usernode && window.usernode.getUserLocale)) {
+          return Promise.resolve(fallback);
+        }
+        return Promise.resolve()
+          .then(function () { return window.usernode.getUserLocale(); })
+          .then(function (res) {
+            return (res && typeof res.locale === 'string' && res.locale)
+              ? res.locale : fallback;
+          })
+          .catch(function () { return fallback; });
+      }
+
       function scanRequest(url) {
-        return api('/api/items/scan', {
-          method: 'POST',
-          body: JSON.stringify({ receiptUrl: url }),
+        return viewerLanguage().then(function (language) {
+          return api('/api/items/scan', {
+            method: 'POST',
+            body: JSON.stringify({ receiptUrl: url, language: language }),
+          });
         }).then(function (res) {
           return res.json().catch(function () { return {}; }).then(function (body) {
             if (res.ok) return { ok: true, data: body };
@@ -963,6 +986,13 @@
         if (scan.low_confidence) $('scan-warning').hidden = false;
         if (scan.store) $('f-store').value = scan.store;
         if (scan.name) $('f-name').value = scan.name;
+        if (scan.name_original) {
+          $('f-name-original').value = scan.name_original;
+          $('f-name-language').value = scan.name_language || '';
+          var noteEl = $('f-name-original-note');
+          noteEl.textContent = 'On the receipt: ' + scan.name_original;
+          noteEl.hidden = false;
+        }
         if (scan.purchase_date) $('f-purchase').value = scan.purchase_date;
         if (scan.price_cents !== null && scan.price_cents !== undefined) {
           $('f-price').value = (scan.price_cents / 100).toFixed(2);
@@ -974,6 +1004,10 @@
         $('scan-warning').hidden = true;
         $('add-note').hidden = true;
         $('scan-status').hidden = false;
+        // A second photo replaces the first receipt's wording.
+        $('f-name-original').value = '';
+        $('f-name-language').value = '';
+        $('f-name-original-note').hidden = true;
         var stored = null;
         downscale(file).then(function (blob) {
           if (window.usernode && window.usernode.uploadFile) {
@@ -1025,6 +1059,8 @@
         if (priceCents !== null && (Number.isNaN(priceCents) || priceCents < 0)) priceCents = null;
         var body = {
           name: $('f-name').value.trim(),
+          name_original: $('f-name-original').value || null,
+          name_language: $('f-name-language').value || null,
           store: $('f-store').value.trim() || null,
           purchase_date: $('f-purchase').value || null,
           price_cents: priceCents,
@@ -1120,6 +1156,13 @@
       function renderItem(item) {
         currentItem = item;
         $('item-name').textContent = item.name;
+        var orig = $('item-name-original');
+        if (item.name_original) {
+          orig.textContent = 'On the receipt: ' + item.name_original;
+          orig.hidden = false;
+        } else {
+          orig.hidden = true;
+        }
         var chip = $('item-chip');
         var s = STATUS[item.status] || STATUS.covered;
         chip.className = 'chip ' + s.cls;
