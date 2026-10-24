@@ -120,6 +120,11 @@
   .chip {
     @apply inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-small font-medium;
   }
+  /* A filter chip: the pill keeps its size, but the tappable box is at
+     least 44 px each way. */
+  .chip-tap {
+    @apply inline-flex min-h-11 min-w-11 items-center justify-center;
+  }
 
   /* The states of anything that loads data. Show exactly one at a time:
      - loading: .skeleton shapes where the data will be, never a blank;
