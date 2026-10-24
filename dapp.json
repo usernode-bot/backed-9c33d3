@@ -21,6 +21,8 @@
       "path": "/?demo=1",
       "expectSelector": "#filter-store"
     },
+    { "name": "First run hides search and filters", "path": "/", "expectSelector": "#view-home:has(#home-welcome:not([hidden])) #home-controls[hidden]" },
+    { "name": "Search and filters show with items", "path": "/?demo=1", "expectSelector": "#home-controls:not([hidden]) #filter-store" },
     { "name": "Settings button on Home", "path": "/", "expectSelector": "#settings-open[aria-label='Settings']" },
     { "name": "Zoom menu in Settings", "path": "/", "expectSelector": "#settings-dialog #zoom-select option[value='200']" },
     { "name": "Settings button on Add", "path": "/add", "expectSelector": "#settings-open" },

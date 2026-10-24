@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
   <script>
   // usernode-dev-console@1
@@ -134,13 +134,17 @@
        (bg-ground, text-muted, bg-accent, ...) that are right in both looks,
        and the kit components. Three screens, one client-side router below:
        / (the item list), /add (capture + confirm), /item/<id> (detail). -->
-  <main class="relative mx-auto flex max-w-md flex-col gap-6 px-4 pb-32 pt-4">
+  <!-- Bottom padding clears the floating add button plus the bottom safe
+       area (Android navigation bar, iPhone home indicator). Bare env() is 0
+       inside the app frame, so the bridge's forwarded inset comes first. -->
+  <main class="relative mx-auto flex max-w-md flex-col gap-6 px-4 pt-4"
+        style="padding-bottom: calc(8rem + var(--un-safe-inset-bottom, env(safe-area-inset-bottom, 0px)));">
 
-    <!-- Settings: above every screen, so zoom and text size are always
-         reachable without taking space on Home. -->
-    <div class="flex justify-end">
-      <button type="button" id="settings-open" class="btn-secondary px-0" aria-label="Settings" aria-haspopup="dialog">
-        <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.84 1.8A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.8l.3 1.5a7 7 0 0 1 1.5.87l1.45-.49a1 1 0 0 1 1.18.45l1.18 2.04a1 1 0 0 1-.2 1.25l-1.15 1.01a7 7 0 0 1 0 1.74l1.15 1.01a1 1 0 0 1 .2 1.25l-1.18 2.04a1 1 0 0 1-1.18.45l-1.45-.49a7 7 0 0 1-1.5.87l-.3 1.5a1 1 0 0 1-.98.8H8.82a1 1 0 0 1-.98-.8l-.3-1.5a7 7 0 0 1-1.5-.87l-1.45.49a1 1 0 0 1-1.18-.45L2.23 13.4a1 1 0 0 1 .2-1.25l1.15-1.01a7 7 0 0 1 0-1.74L2.43 8.39a1 1 0 0 1-.2-1.25L3.41 5.1a1 1 0 0 1 1.18-.45l1.45.49a7 7 0 0 1 1.5-.87l.3-1.5ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd"/></svg>
+    <!-- Settings: a small, quiet icon in the top corner of every screen, so
+         zoom and text size stay reachable without taking a row of their own. -->
+    <div class="absolute right-2 top-4">
+      <button type="button" id="settings-open" class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-muted hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus" aria-label="Settings" aria-haspopup="dialog">
+        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.84 1.8A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.8l.3 1.5a7 7 0 0 1 1.5.87l1.45-.49a1 1 0 0 1 1.18.45l1.18 2.04a1 1 0 0 1-.2 1.25l-1.15 1.01a7 7 0 0 1 0 1.74l1.15 1.01a1 1 0 0 1 .2 1.25l-1.18 2.04a1 1 0 0 1-1.18.45l-1.45-.49a7 7 0 0 1-1.5.87l-.3 1.5a1 1 0 0 1-.98.8H8.82a1 1 0 0 1-.98-.8l-.3-1.5a7 7 0 0 1-1.5-.87l-1.45.49a1 1 0 0 1-1.18-.45L2.23 13.4a1 1 0 0 1 .2-1.25l1.15-1.01a7 7 0 0 1 0-1.74L2.43 8.39a1 1 0 0 1-.2-1.25L3.41 5.1a1 1 0 0 1 1.18-.45l1.45.49a7 7 0 0 1 1.5-.87l.3-1.5ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd"/></svg>
       </button>
     </div>
 
@@ -176,7 +180,9 @@
         <ul id="reminders-list" class="list"></ul>
       </section>
 
-      <section class="flex flex-col gap-3">
+      <!-- Search and filters only help once there is something to search:
+           hidden on first run, shown from the first item on. -->
+      <section id="home-controls" class="flex flex-col gap-3" hidden>
         <input id="search" class="field" type="search" placeholder="Search items or stores"
                aria-label="Search items or stores" autocomplete="off">
         <div class="flex flex-wrap gap-2" role="group" aria-label="Show items">
@@ -244,7 +250,13 @@
               </div>
             </li>
           </ol>
-          <button type="button" id="welcome-add" class="btn-primary h-14 w-full">Add your first receipt</button>
+          <!-- Pinned to the bottom of the screen while the steps scroll, above
+               the bottom safe area, so it is never off-screen or under the
+               system navigation bar. -->
+          <div class="sticky bottom-0 -mx-4 bg-ground px-4 pt-3"
+               style="padding-bottom: calc(1.25rem + var(--un-safe-inset-bottom, env(safe-area-inset-bottom, 0px)));">
+            <button type="button" id="welcome-add" class="btn-primary h-14 w-full">Add your first receipt</button>
+          </div>
         </div>
         <div id="home-error" class="state-error" hidden>
           <svg class="h-6 w-6 text-danger" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
@@ -433,7 +445,7 @@
 
   <!-- The one primary action: a round button floating at the column's edge. -->
   <div id="add-bar" class="pointer-events-none fixed inset-x-0 bottom-0 z-40"
-       style="padding-bottom: calc(1.25rem + env(safe-area-inset-bottom));" hidden>
+       style="padding-bottom: calc(1.25rem + var(--un-safe-inset-bottom, env(safe-area-inset-bottom, 0px)));" hidden>
     <div class="mx-auto flex max-w-md justify-end px-4">
       <button type="button" id="home-add" class="btn-primary pointer-events-auto h-14 w-14 rounded-full px-0 shadow-lg" aria-label="Add receipt">
         <svg class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M1.5 6.375c0-1.036.84-1.875 1.875-1.875h2.27l1.341-1.688A1.875 1.875 0 0 1 8.506 2h2.988a1.875 1.875 0 0 1 1.52.762l1.341 1.688h2.27c1.035 0 1.875.84 1.875 1.875v9.25c0 1.035-.84 1.875-1.875 1.875H3.375A1.875 1.875 0 0 1 1.5 15.625v-9.25Zm4.5 4.625a4 4 0 1 1 8 0 4 4 0 0 1-8 0Z" clip-rule="evenodd"/></svg>
@@ -550,10 +562,16 @@
         error: $('home-error'),
         filteredEmpty: $('home-filtered-empty'),
       };
+      var homeControls = $('home-controls');
       function showHome(state) {
         for (var name in homeViews) homeViews[name].hidden = name !== state;
-        // The welcome screen ends with its own add button.
+        // The welcome screen pins its own add button to the bottom.
         addBar.hidden = state === 'welcome';
+        // Search and filters appear once there are items (including when a
+        // search or filter is what emptied the list, so it can be cleared);
+        // while loading or on an error they keep what they last showed.
+        if (state === 'welcome') homeControls.hidden = true;
+        else if (state === 'list' || state === 'empty' || state === 'filteredEmpty') homeControls.hidden = false;
       }
 
       // Warranty left, as on the card: whole calendar months (UTC, from the
